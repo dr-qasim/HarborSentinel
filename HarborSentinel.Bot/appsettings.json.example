@@ -1,0 +1,25 @@
+﻿{
+  "Bot": {
+    "Token": "TELEGRAM_BOT_TOKEN_HERE",
+    "ModeratorIds": [ 123456789 ]
+  },
+  "Moderation": {
+    "ApiKey": "DEEPSEEK_API_KEY_HERE",
+    "ApiBaseUrl": "https://api.deepseek.com",
+    "Model": "deepseek-chat",
+    "ConfidenceThreshold": 0.75,
+    "TimeoutSeconds": 15
+  },
+  "Storage": {
+    "BasePath": "data",
+    "FilePrefix": "messages",
+    "FlaggedDir": "flagged_lists",
+    "FlushInterval": "00:00:01",
+    "BatchSize": 50
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information"
+    }
+  }
+}

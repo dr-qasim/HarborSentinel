@@ -1,0 +1,23 @@
+﻿# build output
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# runtime data
+HarborSentinel.Bot/data/*.jsonl
+HarborSentinel.Bot/data/flagged_lists/*.json
+HarborSentinel.Bot/**/*.log
+
+# local secrets
+HarborSentinel.Bot/appsettings.json
+HarborSentinel.Bot/appsettings.*.local.json
+.env
