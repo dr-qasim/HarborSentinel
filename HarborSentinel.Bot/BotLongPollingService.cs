@@ -21,6 +21,7 @@ public sealed class BotLongPollingService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var me = await _bot.GetMe(stoppingToken);
+        _log.LogInformation("Telegram bot @{User} is up (id={Id})", me.Username, me.Id);
 
         var receiverOptions = new ReceiverOptions
         {
@@ -28,11 +29,18 @@ public sealed class BotLongPollingService : BackgroundService
             DropPendingUpdates = true
         };
 
-        _bot.StartReceiving(
-            updateHandler: _handler,              // ⬅️ объект, не делегат
-            receiverOptions: receiverOptions,
-            cancellationToken: stoppingToken);
+        _bot.StartReceiving(updateHandler: _handler,
+                            receiverOptions: receiverOptions,
+                            cancellationToken: stoppingToken);
 
-        await Task.Delay(Timeout.Infinite, stoppingToken);
+        try
+        {
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // штатная остановка — молча выходим
+            _log.LogInformation("Stopping long polling (cancellation requested).");
+        }
     }
 }

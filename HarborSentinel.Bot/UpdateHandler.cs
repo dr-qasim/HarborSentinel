@@ -21,6 +21,8 @@ public sealed class UpdateHandler : IUpdateHandler
     private readonly IFlaggedDialogExporter _exporter;
     private readonly BotOptions _botOpt;
     private readonly IRecentMessagesCache _cache;
+    private bool IsModerator(long? userId) =>
+    userId.HasValue && _botOpt.ModeratorIds.Contains(userId.Value);
 
     public UpdateHandler(
         ILogger<UpdateHandler> log,
@@ -52,13 +54,29 @@ public sealed class UpdateHandler : IUpdateHandler
 
             if (m.Text is { } startText && startText.StartsWith("/start", StringComparison.OrdinalIgnoreCase))
             {
-                await bot.SendMessage(
-                    chatId: m.Chat.Id,
-                    text: "👋 Привет! Я фиксирую сообщения и проверяю их с помощью ИИ. При нарушениях уведомляю модераторов.",
-                    cancellationToken: ct
-                );
+                if (IsModerator(record.FromId))
+                {
+                    await bot.SendMessage(
+                        chatId: m.Chat.Id,
+                        text: "👋 Привет! Режим модератора включён. Бот фиксирует сообщения и уведомляет о нарушениях.",
+                        cancellationToken: ct
+                    );
+                }
+                else
+                {
+                    // Отвечаем аятом только в ЛС; в группах — полностью молчим
+                    if (m.Chat.Type == ChatType.Private && _botOpt.ReplyOnlyToModerators)
+                    {
+                        var text = string.IsNullOrWhiteSpace(_botOpt.NonModeratorStartText)
+                            ? "Ас-саляму алейкум!\n\n«Поистине, с тягостью — облегчение. Поистине, с тягостью — облегчение» (Коран 94:5–6)."
+                            : _botOpt.NonModeratorStartText!;
+                        await bot.SendMessage(chatId: m.Chat.Id, text: text, cancellationToken: ct);
+                    }
+                    // Никаких ответов обычным пользователям в группах
+                }
                 return;
             }
+
 
             if (!string.IsNullOrWhiteSpace(record.Text))
             {

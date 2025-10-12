@@ -1,7 +1,9 @@
 ﻿{
   "Bot": {
     "Token": "TELEGRAM_BOT_TOKEN_HERE",
-    "ModeratorIds": [ 123456789 ]
+    "ModeratorIds": [ 123456789 ],
+    "ReplyOnlyToModerators": true,
+    "NonModeratorStartText": "Ас-саляму алейкум!\n\n«Поистине, с тягостью — облегчение. Поистине, с тягостью — облегчение» (Коран 94:5–6)."
   },
   "Moderation": {
     "ApiKey": "DEEPSEEK_API_KEY_HERE",
