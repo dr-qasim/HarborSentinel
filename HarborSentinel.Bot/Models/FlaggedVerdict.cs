@@ -8,8 +8,8 @@ namespace HarborSentinel.Bot.Models
 {
     public sealed class FlaggedVerdict
     {
-        public string? Label { get; init; }     // напр. "extremism", "narcotics", ...
-        public double? Confidence { get; init; }     // 0..1
-        public string? Reason { get; init; }     // краткое пояснение
+        public string? Label { get; init; }
+        public double? Confidence { get; init; }
+        public string? Reason { get; init; }
     }
 }

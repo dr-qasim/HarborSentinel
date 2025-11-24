@@ -54,7 +54,7 @@ namespace HarborSentinel.Bot.Logging
         {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             await _flushRequests.Writer.WriteAsync(tcs, ct);
-            await tcs.Task.WaitAsync(ct); // .NET 7/8 — корректно
+            await tcs.Task.WaitAsync(ct);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -67,11 +67,11 @@ namespace HarborSentinel.Bot.Logging
             {
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    // 1) Быстро выгребаем из очереди всё, что есть, до BatchSize
+                    // Быстро выгребаем из очереди всё, что есть, до BatchSize
                     while (batch.Count < _opt.BatchSize && _queue.Reader.TryRead(out var item))
                         batch.Add(item);
 
-                    // 2) Если батч пуст — ждём или сообщение, или запрос флеша, или таймер
+                    // Если батч пуст — ждём или сообщение, или запрос флеша, или таймер
                     if (batch.Count == 0)
                     {
                         var readMsgTask = _queue.Reader.ReadAsync(stoppingToken).AsTask();
@@ -85,14 +85,14 @@ namespace HarborSentinel.Bot.Logging
                         }
                         else if (completed == readFlushTask)
                         {
-                            // === БАРЬЕРНЫЙ FLUSH ===
+                            // БАРЬЕРНЫЙ FLUSH
                             var tcs = await readFlushTask;
 
-                            // 2.1) Вычистить всё, что сейчас есть в очереди, в batсh
+                            // Вычистить всё, что сейчас есть в очереди, в batсh
                             while (_queue.Reader.TryRead(out var pending))
                                 batch.Add(pending);
 
-                            // 2.2) Если что-то накопили — дозаписать
+                            // Если что-то накопили — дозаписать
                             if (batch.Count > 0)
                             {
                                 await EnsureFileAsync(stoppingToken);
@@ -104,7 +104,7 @@ namespace HarborSentinel.Bot.Logging
                                 batch.Clear();
                             }
 
-                            // 2.3) Финальный flush на диск и ACK барьеру
+                            // Финальный flush на диск и ACK барьеру
                             if (_writer is not null) await _writer.FlushAsync();
                             tcs.TrySetResult(true);
                             continue; // и сразу в следующий цикл
@@ -112,7 +112,7 @@ namespace HarborSentinel.Bot.Logging
                         // если сработал таймер — дадим шанс периодическому flush ниже
                     }
 
-                    // 3) Если есть батч — пишем его
+                    // Если есть батч — пишем его
                     if (batch.Count > 0)
                     {
                         await EnsureFileAsync(stoppingToken);
@@ -124,14 +124,14 @@ namespace HarborSentinel.Bot.Logging
                         batch.Clear();
                     }
 
-                    // 4) Периодический flush (для снижения потери при краше)
+                    // Периодический flush (для снижения потери при краше)
                     if (DateTimeOffset.UtcNow >= nextFlush)
                     {
                         if (_writer is not null) await _writer.FlushAsync();
                         nextFlush = DateTimeOffset.UtcNow.Add(_opt.FlushInterval);
                     }
 
-                    // 5) Обработать накопившиеся запросы флеша (если вдруг пришли пачкой)
+                    // Обработать накопившиеся запросы флеша (если вдруг пришли пачкой)
                     while (_flushRequests.Reader.TryRead(out var tcs))
                     {
                         // ещё раз подчистим очередь на всякий случай

@@ -1,12 +1,13 @@
-﻿using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using HarborSentinel.Bot.Models;
+﻿using HarborSentinel.Bot.Models;
 using HarborSentinel.Bot.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Linq;
+using System.Text;
 using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Telegram.Bot.Types;
 
 namespace HarborSentinel.Bot.Services;
 
@@ -15,6 +16,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
     private readonly ILogger<FlaggedDialogExporter> _log;
     private readonly StorageOptions _opt;
     private readonly IRecentMessagesCache _cache;
+    private readonly IMessageStore _store;
 
     private static readonly JsonSerializerOptions JsonOpt = new()
     {
@@ -24,11 +26,12 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    public FlaggedDialogExporter(ILogger<FlaggedDialogExporter> log, IOptions<StorageOptions> opt, IRecentMessagesCache cache)
+    public FlaggedDialogExporter(ILogger<FlaggedDialogExporter> log, IOptions<StorageOptions> opt, IRecentMessagesCache cache, IMessageStore store)
     {
         _log = log;
         _opt = opt.Value;
         _cache = cache;
+        _store = store;
     }
 
     public async Task<string> ExportAsync(MessageLogRecord trigger, long chatId, int daysBack, CancellationToken ct)
@@ -37,23 +40,27 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
         var flaggedDir = Path.Combine(baseDir, _opt.FlaggedDir);
         Directory.CreateDirectory(flaggedDir);
 
-        var sinceDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-Math.Max(0, daysBack)));
+        // История из БД за daysBack
+        var sinceUtc = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, daysBack));
+        var dbList = await _store.QueryUserMessagesAsync(chatId, trigger.FromId, sinceUtc, untilUtc: null, maxCount: 5000, ct);
+        var collected = new List<DialogMessage>(dbList);
+        var fromDb = collected.Count;
+        _log.LogInformation("Exporter: collected {Count} messages from DB for user {User} in chat {Chat}",
+            fromDb, trigger.FromId, chatId);
 
-        // 1) История из файлов за диапазон
+        // История из файлов за диапазон (как было)
+        var sinceDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-Math.Max(0, daysBack)));
         var files = Directory.EnumerateFiles(baseDir, $"{_opt.FilePrefix}-*.jsonl", SearchOption.TopDirectoryOnly)
             .Where(p => TryParseDate(Path.GetFileName(p), out var d) && d >= sinceDate)
             .OrderBy(p => p, StringComparer.Ordinal);
 
-        var collected = new List<DialogMessage>();
-
-        // 1) История из файлов
         foreach (var file in files)
         {
             await foreach (var rec in ReadJsonl(file, ct))
             {
                 if (rec.ChatId == chatId && rec.FromId == trigger.FromId)
                 {
-                    collected.Add(new DialogMessage
+                    var msg = new DialogMessage
                     {
                         Timestamp = rec.Timestamp,
                         ChatId = rec.ChatId,
@@ -61,21 +68,31 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
                         UserId = rec.FromId,
                         Username = rec.FromUsername,
                         Text = rec.Text
-                    });
+                    };
+
+                    // дедуп против уже добавленных из БД
+                    if (!collected.Any(x =>
+                            x.Timestamp == msg.Timestamp &&
+                            x.ChatId == msg.ChatId &&
+                            x.UserId == msg.UserId &&
+                            string.Equals(x.Text ?? "", msg.Text ?? "", StringComparison.Ordinal)))
+                    {
+                        collected.Add(msg);
+                    }
                 }
             }
         }
-        var fromFiles = collected.Count;
+        var fromFiles = collected.Count - fromDb;
         _log.LogInformation("Exporter: collected {Count} messages from files for user {User} in chat {Chat}",
             fromFiles, trigger.FromId, chatId);
 
-        // 2) Недавние из кэша (берём ОДИН раз)
+        // Недавние из кэша (берём ОДИН раз, как у тебя)
         var cached = _cache.GetRecent(chatId, trigger.FromId, window: TimeSpan.FromMinutes(30), maxCount: 500);
         var fromCache = cached.Count;
         _log.LogInformation("Exporter: recent cache has {Count} messages for user {User} in chat {Chat}",
             fromCache, trigger.FromId, chatId);
 
-        // 3) Merge + дедуп
+        // Merge + дедуп
         foreach (var d in cached)
         {
             if (!collected.Any(x =>
@@ -87,11 +104,10 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
                 collected.Add(d);
             }
         }
-        _log.LogInformation("Exporter: merged total {Total} (files={Files}, cache={Cache}, +trigger pending)",
-            collected.Count, fromFiles, fromCache);
+        _log.LogInformation("Exporter: merged total {Total} (db={Db}, files={Files}, cache={Cache}, +trigger pending)",
+            collected.Count, fromDb, fromFiles, fromCache);
 
-
-        // 3) Гарантированно добавим триггерное сообщение
+        // Гарантированно добавим триггерное сообщение
         var triggerMsg = new DialogMessage
         {
             Timestamp = trigger.Timestamp,
@@ -105,12 +121,12 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
                 d.Timestamp == triggerMsg.Timestamp &&
                 d.ChatId == triggerMsg.ChatId &&
                 d.UserId == triggerMsg.UserId &&
-                string.Equals(d.Text, triggerMsg.Text, StringComparison.Ordinal)))
+                string.Equals(d.Text ?? "", triggerMsg.Text ?? "", StringComparison.Ordinal)))
         {
             collected.Add(triggerMsg);
         }
 
-        // 4) Пакет для модератора
+        // Пакет для модератора
         var payload = new FlaggedDialogPayload
         {
             User = new FlaggedUser
@@ -135,6 +151,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
             Dialog = collected.OrderBy(d => d.Timestamp).ToList()
         };
 
+        // по желанию — уникализировать имя файла (не перезаписывать)
         var outPath = Path.Combine(flaggedDir, $"{trigger.FromId}_chat_{chatId}_dialog.json");
         await File.WriteAllTextAsync(outPath, JsonSerializer.Serialize(payload, JsonOpt), Encoding.UTF8, ct);
 
@@ -164,7 +181,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
     
     private static readonly System.Text.Json.JsonSerializerOptions ReadJsonOpt = new()
     {
-        PropertyNameCaseInsensitive = true // <-- ключевой флаг
+        PropertyNameCaseInsensitive = true // ключевой флаг
     };
 
 

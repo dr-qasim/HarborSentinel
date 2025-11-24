@@ -1,4 +1,4 @@
-using HarborSentinel.Bot;
+п»їusing HarborSentinel.Bot;
 using HarborSentinel.Bot.AI;
 using HarborSentinel.Bot.Logging;
 using HarborSentinel.Bot.Options;
@@ -8,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using HarborSentinel.Bot.Hadith;
 
 
 namespace HarborSentinel.Bot;
@@ -24,49 +27,54 @@ public class Program
             })
             .ConfigureLogging(log =>
             {
-                // консольный логер по умолчанию
+                // РєРѕРЅСЃРѕР»СЊРЅС‹Р№ Р»РѕРіРµСЂ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
                 log.ClearProviders();
                 log.AddConsole();
                 log.SetMinimumLevel(LogLevel.Information);
             })
-            .ConfigureServices((ctx, services) =>
-            {
-                // === Options
-                services.Configure<StorageOptions>(ctx.Configuration.GetSection("Storage"));
+          .ConfigureServices((ctx, services) =>
+          {
+              // Options
+              services.Configure<BotOptions>(ctx.Configuration.GetSection("Bot"));
+              services.Configure<ModerationOptions>(ctx.Configuration.GetSection("Moderation"));
+              services.Configure<StorageOptions>(ctx.Configuration.GetSection("Storage"));
+              services.Configure<DatabaseOptions>(ctx.Configuration.GetSection("Database"));
 
-                // === Telegram client
-                var token = ctx.Configuration["Bot:Token"]
-                            ?? Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
+              // Telegram
+              var token = ctx.Configuration["Bot:Token"] ?? Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
+              if (string.IsNullOrWhiteSpace(token))
+                  throw new InvalidOperationException("Bot token is not configured. Set Bot:Token or TELEGRAM_BOT_TOKEN.");
+              services.AddSingleton<ITelegramBotClient>(_ => new TelegramBotClient(token));
 
-                if (string.IsNullOrWhiteSpace(token))
-                    throw new InvalidOperationException(
-                        "Bot token is not configured. Set Bot:Token or TELEGRAM_BOT_TOKEN.");
+              // HTTP client РґР»СЏ DeepSeek
+              services.AddHttpClient("moderation", http =>
+              {
+                  var baseUrl = ctx.Configuration["Moderation:ApiBaseUrl"] ?? "https://api.deepseek.com";
+                  http.BaseAddress = new Uri(baseUrl);
+                  var timeoutSec = int.TryParse(ctx.Configuration["Moderation:TimeoutSeconds"], out var t) ? t : 15;
+                  http.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSec, 5, 60));
+              });
 
-                services.AddSingleton<ITelegramBotClient>(_ => new TelegramBotClient(token));
-                
-                services.AddHttpClient("moderation", http =>
-                {
-                    var baseUrl = ctx.Configuration["Moderation:ApiBaseUrl"] ?? "https://api.deepseek.com";
-                    http.BaseAddress = new Uri(baseUrl);
-                    var timeoutSec = int.TryParse(ctx.Configuration["Moderation:TimeoutSeconds"], out var t) ? t : 15;
-                    http.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSec, 5, 60));
-                });
-                
-                // === Наши сервисы
-                services.AddSingleton<IAuditSink, JsonlAuditSink>();        // сама писалка
-                services.AddHostedService(sp => (JsonlAuditSink)sp.GetRequiredService<IAuditSink>()); // запустить её как фон. сервис
-                services.AddSingleton<Telegram.Bot.Polling.IUpdateHandler, UpdateHandler>();    // обработчик апдейтов
-                services.AddHostedService<BotLongPollingService>();         // long-polling воркер
+              // РќР°С€Рё СЃРµСЂРІРёСЃС‹
+              services.AddSingleton<IRecentMessagesCache, RecentMessagesCache>();
+              services.AddSingleton<IMessageStore, SqliteMessageStore>();
+              services.AddHostedService<DbInitializer>();
 
-                services.Configure<ModerationOptions>(ctx.Configuration.GetSection("Moderation"));
-                services.Configure<BotOptions>(ctx.Configuration.GetSection("Bot"));
-                services.Configure<StorageOptions>(ctx.Configuration.GetSection("Storage"));
-                
-                services.AddSingleton<IModerationService, DeepSeekModerationService>();
-                services.AddSingleton<IFlaggedDialogExporter, FlaggedDialogExporter>();
-                services.AddSingleton<IRecentMessagesCache, RecentMessagesCache>();
+              services.AddSingleton<IFlaggedDialogExporter, FlaggedDialogExporter>();
+              services.AddSingleton<IModerationService, DeepSeekModerationService>();
 
-            });
+              services.AddSingleton<IAuditSink, JsonlAuditSink>();
+              services.AddHostedService(sp => (JsonlAuditSink)sp.GetRequiredService<IAuditSink>());
+
+              services.AddSingleton<Telegram.Bot.Polling.IUpdateHandler, UpdateHandler>();
+              services.AddHostedService<BotLongPollingService>();
+
+              services.AddSingleton<DemoHadithProvider>();
+              services.AddSingleton<HadeethEncClient>();
+              services.AddSingleton<IHadithProvider, HadeethEncHadithProvider>();
+              services.AddSingleton<HadithCommandHandler>();
+          });
+
 
         using var host = builder.Build();
         await host.RunAsync();

@@ -50,15 +50,28 @@ namespace HarborSentinel.Bot.AI
                 _opt.ApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY"); // запасной вариант
             _gate = new SemaphoreSlim(Math.Max(1, _opt.MaxConcurrency));
         }
+        private string? ResolveApiKey()
+        {
+            if (!string.IsNullOrWhiteSpace(_opt.ApiKey))
+                return _opt.ApiKey;
+
+            var fromOptionsEnv = Environment.GetEnvironmentVariable("Moderation__ApiKey");
+            if (!string.IsNullOrWhiteSpace(fromOptionsEnv))
+                return fromOptionsEnv;
+
+            var fromLegacyEnv = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+            return string.IsNullOrWhiteSpace(fromLegacyEnv) ? null : fromLegacyEnv;
+        }
 
         public async Task<AiVerdict> ModerateAsync(string text, CancellationToken ct)
         {
             if (!_opt.Enabled)
                 return new AiVerdict { Label = "disabled", Confidence = 0, Flagged = null, Reason = "moderation disabled" };
-
-            if (string.IsNullOrWhiteSpace(_opt.ApiKey))
+            
+            var apiKey = ResolveApiKey();
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                _log.LogWarning("DEEPSEEK_API_KEY is not configured; skipping moderation");
+                _log.LogWarning("DeepSeek API key not configured (checked Moderation:ApiKey, env Moderation__ApiKey, env DEEPSEEK_API_KEY); skipping moderation");
                 return new AiVerdict { Label = "unsure", Confidence = 0, Flagged = null, Reason = "no_api_key" };
             }
 
@@ -86,7 +99,8 @@ namespace HarborSentinel.Bot.AI
                 {
                     Content = new StringContent(JsonSerializer.Serialize(request, JsonOpt), Encoding.UTF8, "application/json")
                 };
-                http.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opt.ApiKey);
+
+                http.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
                 using var resp = await client.SendAsync(http, ct);
                 var body = await resp.Content.ReadAsStringAsync(ct);
@@ -170,7 +184,7 @@ namespace HarborSentinel.Bot.AI
             return new Classification { Label = label, Confidence = conf, Reasons = reasons };
         }
 
-        // ===== DTOs для OpenAI-совместимого API =====
+        // DTOs для OpenAI-совместимого API
         private sealed record ChatCompletionsRequest
         {
             [JsonPropertyName("model")] public required string Model { get; init; }
@@ -211,7 +225,7 @@ namespace HarborSentinel.Bot.AI
             [JsonPropertyName("reasons")] public string? Reasons { get; init; }
         }
 
-        // ===== Мини-санитизация перед отправкой в модель =====
+        // Мини-санитизация перед отправкой в модель
         private static string Sanitize(string input)
         {
             return TextSanitizer.MaskSensitive(input, maxLen: 4000);
