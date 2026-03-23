@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HarborSentinel.Bot.Hadith;
 
-/// <summary>
-/// Простой клиент для API HadeethEnc (https://hadeethenc.com/api/v1).
-/// Пока только GET-запросы, без каких-либо ключей.
-/// </summary>
 public sealed class HadeethEncClient
 {
     // Один общий HttpClient на все экземпляры — так безопаснее для сокетов.

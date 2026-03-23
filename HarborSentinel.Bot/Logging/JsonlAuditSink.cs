@@ -24,12 +24,13 @@ namespace HarborSentinel.Bot.Logging
         private readonly ILogger<JsonlAuditSink> _log;
         private readonly StorageOptions _opt;
         private readonly Channel<MessageLogRecord> _queue;
+        private Exception? _terminalError;
 
         private readonly JsonSerializerOptions _json = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // ← ключ
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
         private string? _currentPath;
@@ -50,11 +51,23 @@ namespace HarborSentinel.Bot.Logging
 
         public ValueTask EnqueueAsync(MessageLogRecord record, CancellationToken ct)
             => _queue.Writer.WriteAsync(record, ct);
+       
         public async Task FlushAsync(CancellationToken ct)
         {
+            if (_terminalError is not null)
+                throw new InvalidOperationException("Audit sink is not available.", _terminalError);
+
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            await _flushRequests.Writer.WriteAsync(tcs, ct);
-            await tcs.Task.WaitAsync(ct);
+            try
+            {
+                await _flushRequests.Writer.WriteAsync(tcs, ct).ConfigureAwait(false);
+            }
+            catch (ChannelClosedException ex)
+            {
+                throw new InvalidOperationException("Audit sink is not available.", _terminalError ?? ex);
+            }
+
+            await tcs.Task.WaitAsync(ct).ConfigureAwait(false);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -62,6 +75,7 @@ namespace HarborSentinel.Bot.Logging
             Directory.CreateDirectory(_opt.BasePath);
             var batch = new List<MessageLogRecord>(_opt.BatchSize);
             var nextFlush = DateTimeOffset.UtcNow.Add(_opt.FlushInterval);
+            Exception? terminalError = null;
 
             try
             {
@@ -74,39 +88,32 @@ namespace HarborSentinel.Bot.Logging
                     // Если батч пуст — ждём или сообщение, или запрос флеша, или таймер
                     if (batch.Count == 0)
                     {
-                        var readMsgTask = _queue.Reader.ReadAsync(stoppingToken).AsTask();
-                        var readFlushTask = _flushRequests.Reader.ReadAsync(stoppingToken).AsTask();
-                        var delayTask = Task.Delay(_opt.FlushInterval, stoppingToken);
+                        using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                        var waitToken = waitCts.Token;
 
-                        var completed = await Task.WhenAny(readMsgTask, readFlushTask, delayTask);
-                        if (completed == readMsgTask)
+                        // WaitToReadAsync не потребляет элементы канала, поэтому проигравшие ожидания
+                        // не "утаскивают" сообщения/флеш-запросы.
+                        var waitMessageTask = _queue.Reader.WaitToReadAsync(waitToken).AsTask();
+                        var waitFlushTask = _flushRequests.Reader.WaitToReadAsync(waitToken).AsTask();
+                        var delayTask = Task.Delay(_opt.FlushInterval, waitToken);
+
+                        var completed = await Task.WhenAny(waitMessageTask, waitFlushTask, delayTask);
+                        waitCts.Cancel(); // гарантированно отменяем проигравшие ожидания
+
+                        if (completed == waitMessageTask &&
+                            waitMessageTask.IsCompletedSuccessfully &&
+                            waitMessageTask.Result)
                         {
-                            batch.Add(await readMsgTask);
+                            while (batch.Count < _opt.BatchSize && _queue.Reader.TryRead(out var item))
+                                batch.Add(item);
                         }
-                        else if (completed == readFlushTask)
+                        else if (completed == waitFlushTask &&
+                                 waitFlushTask.IsCompletedSuccessfully &&
+                                 waitFlushTask.Result)
                         {
-                            // БАРЬЕРНЫЙ FLUSH
-                            var tcs = await readFlushTask;
+                            while (_flushRequests.Reader.TryRead(out var tcs))
+                                await FlushAndAckAsync(batch, tcs, stoppingToken);
 
-                            // Вычистить всё, что сейчас есть в очереди, в batсh
-                            while (_queue.Reader.TryRead(out var pending))
-                                batch.Add(pending);
-
-                            // Если что-то накопили — дозаписать
-                            if (batch.Count > 0)
-                            {
-                                await EnsureFileAsync(stoppingToken);
-                                foreach (var rec in batch)
-                                {
-                                    var line = JsonSerializer.Serialize(rec, _json);
-                                    await _writer!.WriteLineAsync(line.AsMemory(), stoppingToken);
-                                }
-                                batch.Clear();
-                            }
-
-                            // Финальный flush на диск и ACK барьеру
-                            if (_writer is not null) await _writer.FlushAsync();
-                            tcs.TrySetResult(true);
                             continue; // и сразу в следующий цикл
                         }
                         // если сработал таймер — дадим шанс периодическому flush ниже
@@ -114,15 +121,7 @@ namespace HarborSentinel.Bot.Logging
 
                     // Если есть батч — пишем его
                     if (batch.Count > 0)
-                    {
-                        await EnsureFileAsync(stoppingToken);
-                        foreach (var rec in batch)
-                        {
-                            var line = JsonSerializer.Serialize(rec, _json);
-                            await _writer!.WriteLineAsync(line.AsMemory(), stoppingToken);
-                        }
-                        batch.Clear();
-                    }
+                        await WriteBatchAsync(batch, stoppingToken);
 
                     // Периодический flush (для снижения потери при краше)
                     if (DateTimeOffset.UtcNow >= nextFlush)
@@ -133,38 +132,87 @@ namespace HarborSentinel.Bot.Logging
 
                     // Обработать накопившиеся запросы флеша (если вдруг пришли пачкой)
                     while (_flushRequests.Reader.TryRead(out var tcs))
-                    {
-                        // ещё раз подчистим очередь на всякий случай
-                        while (_queue.Reader.TryRead(out var pending))
-                            batch.Add(pending);
-
-                        if (batch.Count > 0)
-                        {
-                            await EnsureFileAsync(stoppingToken);
-                            foreach (var rec in batch)
-                            {
-                                var line = JsonSerializer.Serialize(rec, _json);
-                                await _writer!.WriteLineAsync(line.AsMemory(), stoppingToken);
-                            }
-                            batch.Clear();
-                        }
-
-                        if (_writer is not null) await _writer.FlushAsync();
-                        tcs.TrySetResult(true);
-                    }
+                        await FlushAndAckAsync(batch, tcs, stoppingToken);
                 }
             }
             catch (OperationCanceledException) { /* штатная остановка */ }
             catch (Exception ex)
             {
+                terminalError = ex;
                 _log.LogError(ex, "JsonlAuditSink failed");
             }
             finally
             {
-                try { if (_writer is not null) { await _writer.FlushAsync(); _writer.Dispose(); } } catch { }
+                try
+                {
+                    while (_queue.Reader.TryRead(out var pending))
+                        batch.Add(pending);
+
+                    if (batch.Count > 0)
+                        await WriteBatchAsync(batch, CancellationToken.None).ConfigureAwait(false);
+
+                    if (_writer is not null)
+                        await _writer.FlushAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    terminalError ??= ex;
+                    _log.LogError(ex, "JsonlAuditSink failed during shutdown flush");
+                }
+                finally
+                {
+                    try { _writer?.Dispose(); } catch { }
+                    _writer = null;
+                }
+
+                _terminalError = terminalError;
+                _flushRequests.Writer.TryComplete(terminalError);
+
+                while (_flushRequests.Reader.TryRead(out var tcs))
+                {
+                    if (terminalError is null)
+                    {
+                        tcs.TrySetResult(true);
+                    }
+                    else
+                    {
+                        tcs.TrySetException(
+                            new InvalidOperationException("Audit sink is not available.", terminalError));
+                    }
+                }
             }
         }
 
+        private async Task WriteBatchAsync(List<MessageLogRecord> batch, CancellationToken ct)
+        {
+            if (batch.Count == 0)
+                return;
+
+            await EnsureFileAsync(ct);
+            foreach (var rec in batch)
+            {
+                var line = JsonSerializer.Serialize(rec, _json);
+                await _writer!.WriteLineAsync(line.AsMemory(), ct);
+            }
+
+            batch.Clear();
+        }
+
+        private async Task FlushAndAckAsync(
+            List<MessageLogRecord> batch,
+            TaskCompletionSource<bool> tcs,
+            CancellationToken ct)
+        {
+            while (_queue.Reader.TryRead(out var pending))
+                batch.Add(pending);
+
+            await WriteBatchAsync(batch, ct);
+
+            if (_writer is not null)
+                await _writer.FlushAsync();
+
+            tcs.TrySetResult(true);
+        }
 
         private async Task EnsureFileAsync(CancellationToken ct)
         {

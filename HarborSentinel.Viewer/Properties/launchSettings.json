@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "HarborSentinel.Viewer (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "HarborSentinel.Viewer (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

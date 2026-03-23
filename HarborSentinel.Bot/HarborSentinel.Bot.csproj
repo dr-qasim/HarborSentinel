@@ -21,6 +21,17 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Include="data\hadiths-ru.json" CopyToOutputDirectory="PreserveNewest" />
+		<Content Remove="data\hadith_daily_settings.json" />
+		<Content Remove="data\harborsentinel.db" />
+		<Content Remove="data\messages-*.jsonl" />
+		<Content Remove="data\flagged_lists\**\*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Update="data\hadiths-ru.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Update="data\duas-ru.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Update="data\welcome-duas-ru.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Update="data\azkar-ru.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+		<Content Update="data\ayat-ru.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
 	</ItemGroup>
 </Project>

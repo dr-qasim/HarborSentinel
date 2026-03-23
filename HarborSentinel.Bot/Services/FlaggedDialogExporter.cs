@@ -43,7 +43,11 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
         // История из БД за daysBack
         var sinceUtc = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, daysBack));
         var dbList = await _store.QueryUserMessagesAsync(chatId, trigger.FromId, sinceUtc, untilUtc: null, maxCount: 5000, ct);
-        var collected = new List<DialogMessage>(dbList);
+        var collected = new List<DialogMessage>(dbList.Count);
+        var dedup = new HashSet<DialogMessageKey>();
+        foreach (var message in dbList)
+            TryAddDialog(collected, dedup, message);
+
         var fromDb = collected.Count;
         _log.LogInformation("Exporter: collected {Count} messages from DB for user {User} in chat {Chat}",
             fromDb, trigger.FromId, chatId);
@@ -70,15 +74,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
                         Text = rec.Text
                     };
 
-                    // дедуп против уже добавленных из БД
-                    if (!collected.Any(x =>
-                            x.Timestamp == msg.Timestamp &&
-                            x.ChatId == msg.ChatId &&
-                            x.UserId == msg.UserId &&
-                            string.Equals(x.Text ?? "", msg.Text ?? "", StringComparison.Ordinal)))
-                    {
-                        collected.Add(msg);
-                    }
+                    TryAddDialog(collected, dedup, msg);
                 }
             }
         }
@@ -95,14 +91,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
         // Merge + дедуп
         foreach (var d in cached)
         {
-            if (!collected.Any(x =>
-                    x.Timestamp == d.Timestamp &&
-                    x.ChatId == d.ChatId &&
-                    x.UserId == d.UserId &&
-                    string.Equals(x.Text ?? "", d.Text ?? "", StringComparison.Ordinal)))
-            {
-                collected.Add(d);
-            }
+            TryAddDialog(collected, dedup, d);
         }
         _log.LogInformation("Exporter: merged total {Total} (db={Db}, files={Files}, cache={Cache}, +trigger pending)",
             collected.Count, fromDb, fromFiles, fromCache);
@@ -117,14 +106,7 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
             Username = trigger.FromUsername,
             Text = trigger.Text
         };
-        if (!collected.Any(d =>
-                d.Timestamp == triggerMsg.Timestamp &&
-                d.ChatId == triggerMsg.ChatId &&
-                d.UserId == triggerMsg.UserId &&
-                string.Equals(d.Text ?? "", triggerMsg.Text ?? "", StringComparison.Ordinal)))
-        {
-            collected.Add(triggerMsg);
-        }
+        TryAddDialog(collected, dedup, triggerMsg);
 
         // Пакет для модератора
         var payload = new FlaggedDialogPayload
@@ -211,5 +193,29 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
             if (rec is not null) yield return rec;
         }
     }
+
+    private static bool TryAddDialog(
+        List<DialogMessage> collected,
+        HashSet<DialogMessageKey> dedup,
+        DialogMessage message)
+    {
+        var key = new DialogMessageKey(
+            message.Timestamp,
+            message.ChatId,
+            message.UserId,
+            message.Text ?? string.Empty);
+
+        if (!dedup.Add(key))
+            return false;
+
+        collected.Add(message);
+        return true;
+    }
+
+    private readonly record struct DialogMessageKey(
+        DateTimeOffset Timestamp,
+        long ChatId,
+        long? UserId,
+        string Text);
 
 }

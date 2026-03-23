@@ -3,19 +3,37 @@
     "Token": "TELEGRAM_BOT_TOKEN_HERE",
     "ModeratorIds": [ 123456789 ],
     "ReplyOnlyToModerators": true,
-    "NonModeratorStartText": "Ас-саляму алейкум!\n\n«Поистине, с тягостью — облегчение. Поистине, с тягостью — облегчение» (Коран 94:5–6)."
+    "NonModeratorStartText": "Ас-саляму алейкум ва рахматуллахи ва баракятух.\n\nЯ — «Крепость Имана». Помогу делиться дуа, азкарами, хадисами и аятами и, по воле Аллаха, делать вашу группу местом пользы, добрых слов и бараката."
   },
   "Moderation": {
     "ApiKey": "DEEPSEEK_API_KEY_HERE",
     "ApiBaseUrl": "https://api.deepseek.com",
     "Model": "deepseek-chat",
+    "ModelFallbacks": [],
+    "ReasonerEnabled": true,
+    "ReasonerModel": "deepseek-reasoner",
+    "ReasonerTimeoutSeconds": 25,
+    "ReasonerUseForFlagged": true,
+    "ReasonerUseForNeedsContextReview": true,
+    "ReasonerUseForMediumOrHigherRisk": true,
+    "ReasonerUseForHeightenedVigilance": true,
     "ConfidenceThreshold": 0.75,
+    "ContextEnabled": true,
+    "ChatContextWindowMinutes": 20,
+    "ChatContextMaxMessages": 8,
+    "UserContextWindowMinutes": 60,
+    "UserContextMaxMessages": 5,
+    "IncidentWindowMinutes": 30,
+    "IncidentThreshold": 8.0,
+    "IncidentCooldownMinutes": 20,
+    "ChatVigilanceHours": 72,
     "TimeoutSeconds": 15
   },
   "Storage": {
     "BasePath": "data",
     "FilePrefix": "messages",
     "FlaggedDir": "flagged_lists",
+    "TrackedExportsDir": "tracked_exports",
     "FlushInterval": "00:00:01",
     "BatchSize": 50
   },

@@ -12,6 +12,12 @@ namespace HarborSentinel.Bot.Options
         /// <summary>Подкаталог в BasePath для выгрузок подозрительных диалогов.</summary>
         public string FlaggedDir { get; set; } = "flagged_lists";
 
+        /// <summary>Подкаталог в BasePath для тихих выгрузок сообщений отслеживаемых чатов.</summary>
+        public string TrackedExportsDir { get; set; } = "tracked_exports";
+
+        /// <summary>Подкаталог в BasePath для служебных модераторских выгрузок.</summary>
+        public string AdminExportsDir { get; set; } = "admin_exports";
+
         /// <summary>Сколько записей копить в памяти перед записью на диск.</summary>
         public int BatchSize { get; set; } = 64;
 

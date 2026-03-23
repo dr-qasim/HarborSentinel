@@ -1,5 +1,4 @@
-﻿// Models/MessageLogRecord.cs
-using Telegram.Bot.Types;
+﻿using Telegram.Bot.Types;
 
 namespace HarborSentinel.Bot.Models;
 
@@ -42,7 +41,7 @@ public sealed class MessageLogRecord
     {
         return new MessageLogRecord
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = NormalizeTelegramTimestamp(m.Date),
 
             ChatId = m.Chat.Id,
             ChatTitle = m.Chat.Title,
@@ -58,8 +57,8 @@ public sealed class MessageLogRecord
             MessageId = m.MessageId,
             MessageType = m.Type.ToString(),
 
-            Text = m.Text,
-            HasEntities = (m.Entities?.Count() ?? 0) > 0,
+            Text = m.Text ?? m.Caption,
+            HasEntities = ((m.Entities?.Count() ?? 0) + (m.CaptionEntities?.Count() ?? 0)) > 0,
             PhotoCount = m.Photo?.Length,
             HasDocument = m.Document is not null,
             HasAudio = m.Audio is not null,
@@ -68,6 +67,18 @@ public sealed class MessageLogRecord
 
             Ai = null
         };
+    }
+
+    private static DateTimeOffset NormalizeTelegramTimestamp(DateTime value)
+    {
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+
+        return new DateTimeOffset(utc);
     }
 }
 
@@ -85,4 +96,31 @@ public sealed class AiVerdict
 
     /// <summary>Краткое объяснение/причина.</summary>
     public string? Reason { get; init; }
+
+    /// <summary>Семантическая тема сообщения/диалога.</summary>
+    public string? Topic { get; init; }
+
+    /// <summary>Предполагаемое намерение автора.</summary>
+    public string? Intent { get; init; }
+
+    /// <summary>Позиция автора по отношению к опасному содержанию.</summary>
+    public string? Stance { get; init; }
+
+    /// <summary>Общий уровень риска по оценке модели.</summary>
+    public string? RiskLevel { get; init; }
+
+    /// <summary>Нужен ли дополнительный анализ контекста.</summary>
+    public bool? NeedsContextReview { get; init; }
+
+    /// <summary>Предположительно релевантные статьи УК РФ.</summary>
+    public IReadOnlyList<string>? UkArticleCandidates { get; init; }
+
+    /// <summary>Накопительный риск по окну сообщений.</summary>
+    public double? IncidentScore { get; init; }
+
+    /// <summary>Количество событий, вошедших в накопительный риск.</summary>
+    public int? IncidentEventCount { get; init; }
+
+    /// <summary>Вердикт получен из деградационного локального fallback-контра, а не из LLM.</summary>
+    public bool IsModelFailureFallback { get; init; }
 }

@@ -7,15 +7,9 @@ using System.Threading.Tasks;
 
 namespace HarborSentinel.Bot.Hadith;
 
-/// <summary>
-/// Провайдер хадисов:
-/// 1) Пытается загрузить их из файла data/hadiths-ru.json
-/// 2) Если файла нет или он пустой/битый — использует встроенный демо-набор.
-/// </summary>
 public sealed class DemoHadithProvider : IHadithProvider
 {
     private readonly HadithEntry[] _hadiths;
-    private readonly Random _random = new();
 
     public DemoHadithProvider()
     {
@@ -82,7 +76,7 @@ public sealed class DemoHadithProvider : IHadithProvider
         if (_hadiths.Length == 0)
             return Task.FromResult<HadithEntry?>(null);
 
-        var index = _random.Next(0, _hadiths.Length);
+        var index = Random.Shared.Next(0, _hadiths.Length);
         return Task.FromResult<HadithEntry?>(_hadiths[index]);
     }
 
@@ -101,8 +95,8 @@ public sealed class DemoHadithProvider : IHadithProvider
         if (byTopic.Length == 0)
             return Task.FromResult<HadithEntry?>(null);
 
-        var index = _random.Next(0, byTopic.Length);
-        return Task.FromResult<HadithEntry?>(_hadiths[index]);
+        var index = Random.Shared.Next(0, byTopic.Length);
+        return Task.FromResult<HadithEntry?>(byTopic[index]);
     }
 
     public Task<string[]> GetAllTopicsAsync(CancellationToken ct = default)

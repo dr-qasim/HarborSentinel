@@ -121,8 +121,8 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
             var cats = await GetCategoriesCachedAsync(ct).ConfigureAwait(false);
             if (cats is null || cats.Length == 0)
             {
-                _log.LogWarning("HadeethEnc: categories empty in GetRandomByTopic, returning null");
-                return null;
+                _log.LogWarning("HadeethEnc: categories empty in GetRandomByTopic, falling back");
+                return await _fallback.GetRandomByTopicAsync(topicQuery, ct).ConfigureAwait(false);
             }
 
             // Нормализуем запрос и делаем "корень" слова
@@ -138,7 +138,7 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
                 _log.LogInformation(
                     "HadeethEnc: no categories matched topic '{Topic}' (normalized='{Norm}', stem='{Stem}')",
                     topicQuery, queryNorm, queryStem);
-                return null;
+                return await _fallback.GetRandomByTopicAsync(topicQuery, ct).ConfigureAwait(false);
             }
 
             var cat = matchedCats[Random.Shared.Next(0, matchedCats.Length)];
@@ -156,7 +156,7 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
                 _log.LogWarning(
                     "HadeethEnc: no hadeeths in category {CatId} ({CatTitle}) for topic '{Topic}'",
                     cat.Id, cat.Title, topicQuery);
-                return null;
+                return await _fallback.GetRandomByTopicAsync(topicQuery, ct).ConfigureAwait(false);
             }
 
             var item = items[Random.Shared.Next(0, items.Length)];
@@ -167,7 +167,7 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
                 _log.LogWarning(
                     "HadeethEnc: failed to load hadeeth {Id} for topic '{Topic}'",
                     item.Id, topicQuery);
-                return null;
+                return await _fallback.GetRandomByTopicAsync(topicQuery, ct).ConfigureAwait(false);
             }
 
             _log.LogInformation(
@@ -183,7 +183,7 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
         catch (Exception ex)
         {
             _log.LogError(ex, "HadeethEnc: error in GetRandomByTopicAsync(topic='{Topic}')", topicQuery);
-            return null;
+            return await _fallback.GetRandomByTopicAsync(topicQuery, ct).ConfigureAwait(false);
         }
     }
 
@@ -273,10 +273,6 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Грубый "корень" слова: обрезаем русское слово на пару букв с конца,
-    /// чтобы сгладить окончания (терпение -> терпени -> терпен).
-    /// </summary>
     private static string MakeStem(string normalized)
     {
         var s = normalized.Trim();
@@ -300,19 +296,16 @@ public sealed class HadeethEncHadithProvider : IHadithProvider
         if (string.IsNullOrEmpty(titleNorm))
             return false;
 
-        // 1) простое вхождение целой фразы (если повезёт)
         if (!string.IsNullOrEmpty(queryNorm) &&
             titleNorm.Contains(queryNorm, StringComparison.Ordinal))
             return true;
 
-        // 2) разбиваем заголовок на слова и сравниваем по "корню"
         var words = titleNorm.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         foreach (var w in words)
         {
             if (w.Length == 0) continue;
 
-            // если слово в заголовке содержит корень запроса или наоборот
             if (w.Contains(queryStem, StringComparison.Ordinal) ||
                 queryStem.Contains(w, StringComparison.Ordinal))
                 return true;

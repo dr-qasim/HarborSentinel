@@ -1,5 +1,8 @@
 ﻿using HarborSentinel.Bot;
 using HarborSentinel.Bot.AI;
+using HarborSentinel.Bot.Hadith;
+using HarborSentinel.Bot.Hadith.Daily;
+using HarborSentinel.Bot.Islamic;
 using HarborSentinel.Bot.Logging;
 using HarborSentinel.Bot.Options;
 using HarborSentinel.Bot.Services;
@@ -8,9 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Bot;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using HarborSentinel.Bot.Hadith;
 
 
 namespace HarborSentinel.Bot;
@@ -20,11 +20,6 @@ public class Program
     public static async Task Main(string[] args)
     {
         var builder = Host.CreateDefaultBuilder(args)
-            .ConfigureAppConfiguration((ctx, cfg) =>
-            {
-                cfg.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                   .AddEnvironmentVariables();
-            })
             .ConfigureLogging(log =>
             {
                 // консольный логер по умолчанию
@@ -52,15 +47,18 @@ public class Program
                   var baseUrl = ctx.Configuration["Moderation:ApiBaseUrl"] ?? "https://api.deepseek.com";
                   http.BaseAddress = new Uri(baseUrl);
                   var timeoutSec = int.TryParse(ctx.Configuration["Moderation:TimeoutSeconds"], out var t) ? t : 15;
-                  http.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSec, 5, 60));
+                  var reasonerTimeoutSec = int.TryParse(ctx.Configuration["Moderation:ReasonerTimeoutSeconds"], out var rt) ? rt : timeoutSec;
+                  http.Timeout = TimeSpan.FromSeconds(Math.Clamp(Math.Max(timeoutSec, reasonerTimeoutSec), 5, 90));
               });
 
               // Наши сервисы
               services.AddSingleton<IRecentMessagesCache, RecentMessagesCache>();
               services.AddSingleton<IMessageStore, SqliteMessageStore>();
+              services.AddSingleton<IChatRegistry, SqliteChatRegistry>();
               services.AddHostedService<DbInitializer>();
 
               services.AddSingleton<IFlaggedDialogExporter, FlaggedDialogExporter>();
+              services.AddSingleton<ITrackedChatExportService, TrackedChatExportService>();
               services.AddSingleton<IModerationService, DeepSeekModerationService>();
 
               services.AddSingleton<IAuditSink, JsonlAuditSink>();
@@ -72,9 +70,14 @@ public class Program
               services.AddSingleton<DemoHadithProvider>();
               services.AddSingleton<HadeethEncClient>();
               services.AddSingleton<IHadithProvider, HadeethEncHadithProvider>();
+              services.AddSingleton<IIslamicContentProvider, JsonIslamicContentProvider>();
               services.AddSingleton<HadithCommandHandler>();
-          });
 
+              // Ежедневные напоминания хадисом
+              services.AddSingleton<IDailyHadithSettingsStore, JsonDailyHadithSettingsStore>();
+              services.AddHostedService<DailyHadithBackgroundService>();
+
+          });
 
         using var host = builder.Build();
         await host.RunAsync();

@@ -16,6 +16,19 @@ Thumbs.db
 HarborSentinel.Bot/data/*.jsonl
 HarborSentinel.Bot/data/flagged_lists/*.json
 HarborSentinel.Bot/**/*.log
+HarborSentinel.Bot/data/harborsentinel.db
+HarborSentinel.Bot/data/hadith_daily_settings.json
+HarborSentinel.Bot/data/tracked_exports/
+HarborSentinel.Bot/data/admin_exports/
+
+# local analysis inputs
+analysis/moderation_reports/incoming/*.json
+
+# packaged artifacts
+publish/
+*.tar.gz
+*.tar.gz.sha256
+*.binlog
 
 # local secrets
 HarborSentinel.Bot/appsettings.json

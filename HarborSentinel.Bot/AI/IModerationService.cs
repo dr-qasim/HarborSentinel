@@ -9,11 +9,16 @@ namespace HarborSentinel.Bot.AI
 {
     /// <summary>
     /// Контракт сервиса модерации контента. Реализация будет вызывать DeepSeek.
-    /// В случае сетевой ошибки/таймаута — возвращаем AiVerdict с Flagged = null и Reason = "llm_error" (или подобным),
-    /// чтобы остальная система не падала.
+    /// В случае сетевой ошибки/таймаута должен возвращаться деградационный verdict,
+    /// чтобы остальная система не падала и не теряла накопительный риск.
     /// </summary>
     public interface IModerationService
     {
+        /// <summary>
+        /// Классифицирует сообщение с опциональным диалоговым контекстом.
+        /// </summary>
+        Task<AiVerdict> ModerateAsync(ModerationRequest request, CancellationToken ct);
+
         /// <summary>
         /// Классифицирует текст сообщения. Должен быть безопасным к ошибкам: не бросать исключения наружу.
         /// </summary>
@@ -23,7 +28,7 @@ namespace HarborSentinel.Bot.AI
         /// AiVerdict:
         ///   Label — метка (напр. "extremism" | "terrorism" | "narcotics" | "neutral" | "unsure"),
         ///   Confidence — 0..1,
-        ///   Flagged — true/false/null (null, если модерация отключена или ошибка),
+        ///   Flagged — true/false/null (null допустим только когда модерация сознательно отключена),
         ///   Reason — краткое пояснение/диагностика.
         /// </returns>
         Task<AiVerdict> ModerateAsync(string text, CancellationToken ct);
