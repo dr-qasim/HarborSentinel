@@ -1,0 +1,265 @@
+<UserControl x:Class="HarborSentinel.AdminConsole.Views.ExportsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:HarborSentinel.AdminConsole.Views"
+             xmlns:viewModels="clr-namespace:HarborSentinel.AdminConsole.ViewModels"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <DataTemplate DataType="{x:Type viewModels:ExportJobDetailViewModel}">
+            <StackPanel>
+                <TextBlock Text="{Binding Label}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <controls:CopyValueBlock Margin="0,4,0,0"
+                                         DisplayText="{Binding JobId, StringFormat=ID задачи: {0}}"
+                                         CopyValue="{Binding JobId}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Text="Состояние"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Статус" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Status}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Область" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ScopeSummary}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Запрошено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding RequestedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Запущено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding StartedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Завершено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CompletedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Результат" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding ResultSummary}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,12,0,12" />
+
+                <TextBlock Text="Файл результата"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Имя файла" Style="{StaticResource FieldLabelStyle}" />
+                    <controls:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                             DisplayText="{Binding FileName}"
+                                             CopyValue="{Binding FileNameCopyValue}"
+                                             TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Размер" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FileSize}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Создан" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FileCreatedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Ошибка" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,8">
+            <GroupBox Header="Запуск выгрузки">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="Тип выгрузки" Style="{StaticResource FieldLabelStyle}" />
+                        <ComboBox ItemsSource="{Binding CatalogItems}"
+                                  SelectedItem="{Binding SelectedKind}"
+                                  DisplayMemberPath="Label" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="ID чата" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBox Text="{Binding ChatIdText, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding IsChatIdRequired}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                        <TextBlock Text="Описание" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Text="{Binding SelectedKindDescription}" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,8,0,0" Text="Доступность" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBlock Text="{Binding SelectedKindAvailability}" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Button Command="{Binding CreateJobCommand}" Content="Создать задачу" />
+                        <Button Command="{Binding RefreshCommand}" Content="Обновить" Margin="12,0,0,0" />
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Сводка">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние запроса" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Каталог" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSummary}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Задачи" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding JobsSummary}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Последнее обновление" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LastUpdated}" TextWrapping="Wrap" />
+                </Grid>
+            </GroupBox>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.55*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="1.25*" />
+                </Grid.ColumnDefinitions>
+
+                <GroupBox Grid.Column="0" Header="Задачи выгрузки">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <DataGrid Grid.Row="0"
+                                  ItemsSource="{Binding Jobs}"
+                                  SelectedItem="{Binding SelectedJob}"
+                                  AutoGenerateColumns="False"
+                                  SelectionMode="Single"
+                                  MouseDoubleClick="OnJobsRowDoubleClick">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="ID задачи" Width="1.25*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <controls:CopyValueBlock DisplayText="{Binding JobId}"
+                                                                     CopyValue="{Binding JobId}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Тип" Binding="{Binding Label}" Width="1.35*" />
+                                <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="1*" />
+                                <DataGridTextColumn Header="Область" Binding="{Binding ScopeSummary}" Width="1.4*" />
+                                <DataGridTextColumn Header="Запрошено (UTC)" Binding="{Binding RequestedAtUtc}" Width="1.35*" />
+                                <DataGridTextColumn Header="Завершено (UTC)" Binding="{Binding CompletedAtUtc}" Width="1.35*" />
+                                <DataGridTextColumn Header="Результат" Binding="{Binding ResultSummary}" Width="1.5*" />
+                                <DataGridTextColumn Header="Скачать" Binding="{Binding HasDownload}" Width="0.8*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <GroupBox Grid.Row="1" Margin="0,12,0,0" Header="{Binding WarningsHeadline}">
+                            <Grid Margin="8">
+                                <ListBox ItemsSource="{Binding Warnings}" MinHeight="90" />
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Grid.Column="2" Header="Карточка выгрузки">
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding DetailStatus}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{Binding DetailLastUpdated, StringFormat=Последнее обновление карточки: {0}}" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{Binding DownloadStatus}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Command="{Binding RefreshDetailCommand}" Content="Обновить карточку" Margin="12,0,0,0" />
+                                <Button Content="Открыть viewer"
+                                        Margin="12,0,0,0"
+                                        IsEnabled="{Binding CanOpenViewer}"
+                                        Click="OnOpenExportViewerClick" />
+                                <Button Command="{Binding DownloadCommand}" Content="Скачать файл" Margin="12,0,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1"
+                                   Margin="0,8,0,8"
+                                   Text="Файл отдается только через controlled job-result endpoint AdminHost и сохраняется локально на рабочую станцию."
+                                   TextWrapping="Wrap" />
+
+                        <Border Grid.Row="2"
+                                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                                BorderThickness="1"
+                                Padding="8">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Выберите задачу слева, чтобы открыть подробности."
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedJobDetail}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <ContentControl Content="{Binding SelectedJobDetail}" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <GroupBox Grid.Row="3" Margin="0,12,0,0" Header="{Binding DetailWarningsHeadline}">
+                            <Grid Margin="8">
+                                <ListBox ItemsSource="{Binding DetailWarnings}" MinHeight="90" />
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </GroupBox>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

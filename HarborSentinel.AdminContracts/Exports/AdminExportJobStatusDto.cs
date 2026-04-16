@@ -1,0 +1,9 @@
+namespace HarborSentinel.AdminContracts.Exports;
+
+public enum AdminExportJobStatusDto
+{
+    Pending = 0,
+    Running = 1,
+    Completed = 2,
+    Failed = 3
+}

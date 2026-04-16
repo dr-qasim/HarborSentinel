@@ -1,0 +1,92 @@
+<Window x:Class="HarborSentinel.AdminConsole.Views.UserCardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Width="880"
+        Height="740"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False">
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Строка статуса с кнопками -->
+            <RowDefinition Height="Auto" />
+            <!-- Содержимое карточки -->
+            <RowDefinition Height="*" />
+            <!-- Предупреждения -->
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Статус-бар: состояние загрузки + кнопки управления -->
+        <Border Grid.Row="0"
+                Padding="14,10"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DetailStatus}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding DetailLastUpdated, StringFormat=Обновлено: {0}}"
+                               FontSize="11"
+                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding RefreshDetailCommand}"
+                            Content="Обновить"
+                            ToolTip="Перезагрузить карточку пользователя" />
+                    <Button Content="Закрыть"
+                            Click="OnCloseClick"
+                            Margin="0,0,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Основное содержимое карточки -->
+        <ScrollViewer Grid.Row="1"
+                      Padding="16,14,16,14"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Состояние загрузки: показывается, пока карточка не загружена -->
+                <TextBlock Text="Загрузка данных о пользователе..."
+                           FontStyle="Italic"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedUserDetail}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Карточка пользователя (DataTemplate из App.xaml применяется автоматически) -->
+                <ContentControl Content="{Binding SelectedUserDetail}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Предупреждения карточки -->
+        <GroupBox Grid.Row="2"
+                  Header="{Binding DetailWarningsHeadline}"
+                  Margin="12,0,12,12">
+            <Grid Margin="8">
+                <ListBox ItemsSource="{Binding DetailWarnings}"
+                         MinHeight="50"
+                         MaxHeight="100" />
+            </Grid>
+        </GroupBox>
+    </Grid>
+</Window>

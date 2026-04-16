@@ -1,3 +1,4 @@
+using HarborSentinel.Bot.Services;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -5,10 +6,13 @@ using Telegram.Bot.Types.Enums;
 
 public sealed class BotLongPollingService : BackgroundService
 {
-    private static readonly UpdateType[] ReceiverAllowedUpdates = Enum
-        .GetValues<UpdateType>()
-        .Where(static updateType => !string.Equals(updateType.ToString(), "Unknown", StringComparison.Ordinal))
-        .ToArray();
+    private static readonly UpdateType[] ReceiverAllowedUpdates =
+    [
+        UpdateType.Message,
+        UpdateType.CallbackQuery,
+        UpdateType.MyChatMember,
+        UpdateType.ChatMember
+    ];
 
     private static readonly IReadOnlyList<BotCommand> PublicGroupCommands =
     [
@@ -21,14 +25,14 @@ public sealed class BotLongPollingService : BackgroundService
         new() { Command = "ayat_day", Description = "Аят дня" },
         new() { Command = "today", Description = "Польза на сегодня" },
         new() { Command = "help_me", Description = "По состоянию" },
-        new() { Command = "about", Description = "О боте" },
-        new() { Command = "iman_daily_on", Description = "Включить напоминания" },
-        new() { Command = "iman_daily_off", Description = "Отключить напоминания" }
+        new() { Command = "about", Description = "О боте" }
     ];
 
     private static readonly IReadOnlyList<BotCommand> GroupAdminCommands =
     [
-        .. PublicGroupCommands
+        .. PublicGroupCommands,
+        new() { Command = "iman_daily_on", Description = "Включить напоминания" },
+        new() { Command = "iman_daily_off", Description = "Отключить напоминания" }
     ];
 
     private static readonly IReadOnlyList<(IReadOnlyList<BotCommand> Commands, BotCommandScope Scope, string? LanguageCode, string ScopeName)> CommandTargets =
@@ -41,21 +45,25 @@ public sealed class BotLongPollingService : BackgroundService
 
     private readonly ITelegramBotClient _bot;
     private readonly IUpdateHandler _handler;
+    private readonly IChatRegistry _chatRegistry;
     private readonly ILogger<BotLongPollingService> _log;
 
     public BotLongPollingService(
         ITelegramBotClient bot,
         IUpdateHandler handler,
+        IChatRegistry chatRegistry,
         ILogger<BotLongPollingService> log)
     {
         _bot = bot;
         _handler = handler;
+        _chatRegistry = chatRegistry;
         _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var me = await _bot.GetMe(stoppingToken);
+        await _chatRegistry.ApplyCurrentBotIdentityAsync(me.Id, stoppingToken).ConfigureAwait(false);
         _log.LogInformation("Telegram bot @{User} is up (id={Id})", me.Username, me.Id);
 
         await SyncGroupCommandsAsync(stoppingToken).ConfigureAwait(false);

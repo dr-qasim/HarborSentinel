@@ -133,8 +133,9 @@ public sealed class FlaggedDialogExporter : IFlaggedDialogExporter
             Dialog = collected.OrderBy(d => d.Timestamp).ToList()
         };
 
-        // по желанию — уникализировать имя файла (не перезаписывать)
-        var outPath = Path.Combine(flaggedDir, $"{trigger.FromId}_chat_{chatId}_dialog.json");
+        // Используем timestamp чтобы не перезаписывать предыдущие экспорты при повторных флагах
+        var exportTs = DateTimeOffset.UtcNow.UtcDateTime.ToString("yyyyMMdd_HHmmss");
+        var outPath = Path.Combine(flaggedDir, $"{trigger.FromId}_chat_{chatId}_dialog_{exportTs}.json");
         await File.WriteAllTextAsync(outPath, JsonSerializer.Serialize(payload, JsonOpt), Encoding.UTF8, ct);
 
         _log.LogInformation("Flagged dialog saved: {Path} (messages={Count})", outPath, collected.Count);

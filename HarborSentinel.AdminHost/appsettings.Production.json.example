@@ -1,0 +1,20 @@
+{
+  "AdminHost": {
+    "ListenUrl": "http://127.0.0.1:58421",
+    "ApiToken": "set-a-long-random-admin-token"
+  },
+  "HarborRuntime": {
+    "DatabasePath": "/opt/harborsentinel/data/harborsentinel.db",
+    "StorageBasePath": "/opt/harborsentinel/data",
+    "TrackedExportsDir": "tracked_exports",
+    "AdminExportsDir": "admin_exports",
+    "AdminStateDir": "adminhost_state"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "localhost;127.0.0.1"
+}

@@ -1,0 +1,269 @@
+<Window x:Class="HarborSentinel.AdminConsole.Views.ChatCardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:HarborSentinel.AdminConsole.Views"
+        xmlns:viewModels="clr-namespace:HarborSentinel.AdminConsole.ViewModels"
+        mc:Ignorable="d"
+        Width="880"
+        Height="740"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False">
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type viewModels:ChatDetailViewModel}">
+            <StackPanel>
+                <TextBlock Text="{Binding DisplayTitle}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <views:CopyValueBlock Margin="0,4,0,0"
+                                      DisplayText="{Binding ChatId, StringFormat=ID чата: {0}}"
+                                      CopyValue="{Binding ChatId}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Text="Реестр"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Имя пользователя" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                          DisplayText="{Binding Username}"
+                                          CopyValue="{Binding UsernameCopyValue}"
+                                          TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Тип чата" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ChatType}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Статус бота" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Status}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Активен" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Active}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Отслеживается" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Tracked}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Область видимости" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding ScopeMode}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Первое наблюдение" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding FirstSeenUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Последняя активность" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding LastSeenUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Удалён из чата" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding RemovedUtc}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,12,0,12" />
+
+                <TextBlock Text="Контур активности и модерации"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Сообщений" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MessageCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Последнее сообщение" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LastMessageUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Участников" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ParticipantCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Администраторов" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AdminParticipantCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Помеченных пользователей" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding FlaggedUserCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Всего flagged-событий" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding FlaggedEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Flagged за окно обзора" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding RecentFlaggedEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="7" Grid.Column="0" Text="Последнее flagged-событие" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding LastFlaggedUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="8" Grid.Column="0" Text="Всего risk-событий" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding RiskEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="9" Grid.Column="0" Text="Risk за окно обзора" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding RecentRiskEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="10" Grid.Column="0" Text="Последнее risk-событие" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding LastRiskUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="11" Grid.Column="0" Text="Последняя оценка" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="11" Grid.Column="1" Text="{Binding LastRiskScore}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,12,0,12" />
+
+                <TextBlock Text="Последний risk-контекст"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Метка" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LastRiskLabel}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Тема" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LastRiskTopic}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Интент" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastRiskIntent}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Причина" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LastRiskReason}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,12,0,12" />
+
+                <TextBlock Text="Повышенная бдительность"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VigilanceStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="До" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding HeightenedUntilUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Последний триггер" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastTriggeredUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Срабатываний" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TriggerCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Последняя метка" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding VigilanceLabel}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Последняя тема" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding VigilanceTopic}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Последний контекст" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding VigilanceRiskLevel}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Последний score" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VigilanceScore}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Причина" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VigilanceReason}" TextWrapping="Wrap" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="14,10"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DetailStatus}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding DetailLastUpdated, StringFormat=Обновлено: {0}}"
+                               FontSize="11"
+                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding RefreshDetailCommand}"
+                            Content="Обновить"
+                            ToolTip="Перезагрузить карточку чата" />
+                    <Button Content="Закрыть"
+                            Click="OnCloseClick"
+                            Margin="0,0,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Padding="16,14,16,14"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Загрузка данных о чате..."
+                           FontStyle="Italic"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedChatDetail}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <ContentControl Content="{Binding SelectedChatDetail}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <GroupBox Grid.Row="2"
+                  Header="{Binding DetailWarningsHeadline}"
+                  Margin="12,0,12,12">
+            <Grid Margin="8">
+                <ListBox ItemsSource="{Binding DetailWarnings}"
+                         MinHeight="50"
+                         MaxHeight="100" />
+            </Grid>
+        </GroupBox>
+    </Grid>
+</Window>

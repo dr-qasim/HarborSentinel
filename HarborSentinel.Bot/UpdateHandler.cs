@@ -26,6 +26,7 @@ public sealed class UpdateHandler : IUpdateHandler
     private const int PersistenceRetryAttempts = 5;
     private const int PersistenceRetryBaseDelayMs = 100;
     private static readonly TimeSpan TrackedStateCacheTtl = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan WelcomeSendCooldown = TimeSpan.FromSeconds(45);
     private static readonly JsonSerializerOptions ExportJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -40,6 +41,7 @@ public sealed class UpdateHandler : IUpdateHandler
     private readonly IModerationService _moderation;
     private readonly IFlaggedDialogExporter _exporter;
     private readonly ITrackedChatExportService _trackedChatExport;
+    private readonly IModeratorDeliverySink _moderatorDelivery;
     private readonly BotOptions _botOpt;
     private readonly ModerationOptions _moderationOpt;
     private readonly IRecentMessagesCache _cache;
@@ -52,6 +54,7 @@ public sealed class UpdateHandler : IUpdateHandler
     private readonly string _adminExportsPath;
     private readonly object _backupFileSync = new();
     private readonly ConcurrentDictionary<long, TrackedStateCacheItem> _trackedStateCache = new();
+    private readonly ConcurrentDictionary<long, DateTimeOffset> _recentWelcomeByChat = new();
     private string? _cachedBotUsername;
 
 
@@ -64,6 +67,7 @@ public sealed class UpdateHandler : IUpdateHandler
         IModerationService moderation,
         IFlaggedDialogExporter exporter,
         ITrackedChatExportService trackedChatExport,
+        IModeratorDeliverySink moderatorDelivery,
         IRecentMessagesCache cache,
         IMessageStore store,
         IChatRegistry chatRegistry,
@@ -79,6 +83,7 @@ public sealed class UpdateHandler : IUpdateHandler
         _moderation = moderation;
         _exporter = exporter;
         _trackedChatExport = trackedChatExport;
+        _moderatorDelivery = moderatorDelivery;
         _cache = cache;
         _botOpt = botOpt.Value;
         _moderationOpt = moderationOpt.Value;
@@ -169,20 +174,18 @@ public sealed class UpdateHandler : IUpdateHandler
                     if (!IsModerator(record.FromId))
                         return;
 
+                    var isDisabledExportCommand = IsDisabledExportCommand(privateCommand);
                     var isAdminCommand =
                         string.Equals(privateCommand, "/admin_status", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_groups", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_tracked", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_track", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_untrack", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(privateCommand, "/admin_dump", StringComparison.OrdinalIgnoreCase) ||
+                        isDisabledExportCommand ||
                         string.Equals(privateCommand, "/admin_participants", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(privateCommand, "/admin_participants_dump", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_flagged_users", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_user_chats", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(privateCommand, "/admin_user_dump", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_started_users", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(privateCommand, "/admin_started_users_dump", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_health", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_chat_summary", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(privateCommand, "/admin_incidents", StringComparison.OrdinalIgnoreCase);
@@ -196,6 +199,18 @@ public sealed class UpdateHandler : IUpdateHandler
             if (m.NewChatMembers is { Length: > 0 })
             {
                 await HandleNewChatMembersAsync(bot, m, ct).ConfigureAwait(false);
+            }
+
+            if (m.Text is not null && IsDisabledExportCommand(textCommand))
+            {
+                if (m.Chat.Type != ChatType.Private)
+                    return;
+
+                if (!IsModerator(record.FromId))
+                    return;
+
+                await SendDisabledExportSurfaceMessageAsync(bot, m.Chat.Id, ct).ConfigureAwait(false);
+                return;
             }
 
             if (m.Text is not null &&
@@ -212,6 +227,7 @@ public sealed class UpdateHandler : IUpdateHandler
                 var text =
                     $"👋 Привет, {record.FromFirstName}!\n\n" +
                     "Это служебная сводка для модератора.\n\n" +
+                    $"Версия бота: {BotBuildInfo.DisplayVersion}\n" +
                     $"Ваш user id: {record.FromId}\n" +
                     $"Вы внесены в список модераторов бота: ✅ (всего модераторов: {_botOpt.ModeratorIds.Count})\n\n" +
                     "Бот запущен.\n" +
@@ -279,19 +295,6 @@ public sealed class UpdateHandler : IUpdateHandler
                 return;
             }
 
-            if (m.Text is { } dumpText &&
-                string.Equals(textCommand, "/admin_dump", StringComparison.OrdinalIgnoreCase))
-            {
-                if (m.Chat.Type != ChatType.Private)
-                    return;
-
-                if (!IsModerator(record.FromId))
-                    return;
-
-                await HandleAdminDumpAsync(bot, m, dumpText, ct).ConfigureAwait(false);
-                return;
-            }
-
             if (m.Text is { } participantsText &&
                 string.Equals(textCommand, "/admin_participants", StringComparison.OrdinalIgnoreCase))
             {
@@ -302,19 +305,6 @@ public sealed class UpdateHandler : IUpdateHandler
                     return;
 
                 await HandleAdminParticipantsAsync(bot, m, participantsText, ct).ConfigureAwait(false);
-                return;
-            }
-
-            if (m.Text is { } participantsDumpText &&
-                string.Equals(textCommand, "/admin_participants_dump", StringComparison.OrdinalIgnoreCase))
-            {
-                if (m.Chat.Type != ChatType.Private)
-                    return;
-
-                if (!IsModerator(record.FromId))
-                    return;
-
-                await HandleAdminParticipantsDumpAsync(bot, m, participantsDumpText, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -344,19 +334,6 @@ public sealed class UpdateHandler : IUpdateHandler
                 return;
             }
 
-            if (m.Text is { } userDumpText &&
-                string.Equals(textCommand, "/admin_user_dump", StringComparison.OrdinalIgnoreCase))
-            {
-                if (m.Chat.Type != ChatType.Private)
-                    return;
-
-                if (!IsModerator(record.FromId))
-                    return;
-
-                await HandleAdminUserDumpAsync(bot, m, userDumpText, ct).ConfigureAwait(false);
-                return;
-            }
-
             if (m.Text is { } startedUsersText &&
                 string.Equals(textCommand, "/admin_started_users", StringComparison.OrdinalIgnoreCase))
             {
@@ -367,19 +344,6 @@ public sealed class UpdateHandler : IUpdateHandler
                     return;
 
                 await HandleAdminStartedUsersAsync(bot, m, startedUsersText, ct).ConfigureAwait(false);
-                return;
-            }
-
-            if (m.Text is { } startedUsersDumpText &&
-                string.Equals(textCommand, "/admin_started_users_dump", StringComparison.OrdinalIgnoreCase))
-            {
-                if (m.Chat.Type != ChatType.Private)
-                    return;
-
-                if (!IsModerator(record.FromId))
-                    return;
-
-                await HandleAdminStartedUsersDumpAsync(bot, m, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -565,82 +529,15 @@ public sealed class UpdateHandler : IUpdateHandler
 
             if (record.Ai?.Flagged == true && _botOpt.ModeratorIds.Count > 0)
             {
-                await _audit.FlushAsync(ct);
-                var filePath = await _exporter.ExportAsync(record, record.ChatId, daysBack: 14, ct);
-
-                var chatDisplay = BuildChatDisplay(record);
-                var userDisplay = BuildUserDisplay(record);
-                var messageLink = BuildMessageLink(record);
-                var userLink = BuildUserLink(record);
-
-                var caption = BuildModerationCaption(record, chatDisplay, userDisplay, messageLink, conversationRisk.Snapshot);
-                var details = BuildModerationDetails(record, chatDisplay, userDisplay, userLink, messageLink, conversationRisk.Snapshot);
-
-                foreach (var modId in _botOpt.ModeratorIds)
-                {
-                    try
-                    {
-                        if (!string.IsNullOrWhiteSpace(details))
-                        {
-                            await bot.SendMessage(
-                                chatId: modId,
-                                text: details,
-                                cancellationToken: ct
-                            ).ConfigureAwait(false);
-                        }
-
-                        await using var fs = System.IO.File.OpenRead(filePath);
-                        var doc = Telegram.Bot.Types.InputFile.FromStream(fs, System.IO.Path.GetFileName(filePath));
-                        await bot.SendDocument(
-                            chatId: modId,
-                            document: doc,
-                            caption: caption,
-                            cancellationToken: ct
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.LogError(ex, "Failed to notify moderator {ModId}", modId);
-                    }
-                }
+                await _audit.FlushAsync(ct).ConfigureAwait(false);
+                var notification = BuildFlaggedModeratorDeliveryEvent(record, conversationRisk.Snapshot);
+                await TryPublishModeratorDeliveryAsync(notification, ct).ConfigureAwait(false);
             }
             else if (conversationRisk.ShouldNotify && _botOpt.ModeratorIds.Count > 0)
             {
                 await _audit.FlushAsync(ct).ConfigureAwait(false);
-                var filePath = await _exporter.ExportAsync(record, record.ChatId, daysBack: 14, ct).ConfigureAwait(false);
-
-                var chatDisplay = BuildChatDisplay(record);
-                var userDisplay = BuildUserDisplay(record);
-                var messageLink = BuildMessageLink(record);
-                var userLink = BuildUserLink(record);
-
-                var caption = BuildConversationRiskCaption(record, chatDisplay, userDisplay, messageLink, conversationRisk.Snapshot);
-                var details = BuildConversationRiskDetails(record, chatDisplay, userDisplay, userLink, messageLink, conversationRisk.Snapshot);
-
-                foreach (var modId in _botOpt.ModeratorIds)
-                {
-                    try
-                    {
-                        await bot.SendMessage(
-                            chatId: modId,
-                            text: details,
-                            cancellationToken: ct
-                        ).ConfigureAwait(false);
-
-                        await using var fs = System.IO.File.OpenRead(filePath);
-                        var doc = Telegram.Bot.Types.InputFile.FromStream(fs, System.IO.Path.GetFileName(filePath));
-                        await bot.SendDocument(
-                            chatId: modId,
-                            document: doc,
-                            caption: caption,
-                            cancellationToken: ct
-                        ).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.LogError(ex, "Failed to notify moderator {ModId} about conversation risk", modId);
-                    }
-                }
+                var notification = BuildConversationRiskModeratorDeliveryEvent(record, conversationRisk.Snapshot);
+                await TryPublishModeratorDeliveryAsync(notification, ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -969,22 +866,11 @@ public sealed class UpdateHandler : IUpdateHandler
         }
 
         var text = TruncateText(sb.ToString(), 3500);
-
-        foreach (var modId in _botOpt.ModeratorIds)
-        {
-            try
-            {
-                await bot.SendMessage(
-                    chatId: modId,
-                    text: text,
-                    cancellationToken: ct
-                ).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Failed to notify moderator {ModId} about bot-added event", modId);
-            }
-        }
+        await TrySendModeratorNotificationAsync(
+            bot,
+            text,
+            "bot-added event",
+            ct).ConfigureAwait(false);
     }
 
     private async Task NotifyModeratorsAboutBotRemovedAsync(
@@ -1040,7 +926,19 @@ public sealed class UpdateHandler : IUpdateHandler
         sb.Append(update.NewChatMember.Status);
 
         var text = TruncateText(sb.ToString(), 3500);
+        await TrySendModeratorNotificationAsync(
+            bot,
+            text,
+            "bot-removed event",
+            ct).ConfigureAwait(false);
+    }
 
+    private async Task TrySendModeratorNotificationAsync(
+        ITelegramBotClient bot,
+        string text,
+        string eventName,
+        CancellationToken ct)
+    {
         foreach (var modId in _botOpt.ModeratorIds)
         {
             try
@@ -1053,7 +951,7 @@ public sealed class UpdateHandler : IUpdateHandler
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Failed to notify moderator {ModId} about bot-removed event", modId);
+                _log.LogError(ex, "Failed to notify moderator {ModId} about {EventName}", modId, eventName);
             }
         }
     }
@@ -1635,6 +1533,15 @@ public sealed class UpdateHandler : IUpdateHandler
         if (humans.Length == 0)
             return;
 
+        if (ShouldSuppressWelcomeMessage(message.Chat.Id, DateTimeOffset.UtcNow))
+        {
+            _log.LogInformation(
+                "Welcome suppressed by cooldown for {Count} new members in chat {ChatId}",
+                humans.Length,
+                message.Chat.Id);
+            return;
+        }
+
         var welcomeDua = await _islamicProvider.GetRandomWelcomeDuaAsync(ct).ConfigureAwait(false);
         if (welcomeDua is null)
         {
@@ -1893,6 +1800,26 @@ public sealed class UpdateHandler : IUpdateHandler
         status == ChatMemberStatus.Administrator ||
         status == ChatMemberStatus.Creator ||
         status == ChatMemberStatus.Restricted;
+
+    private bool ShouldSuppressWelcomeMessage(long chatId, DateTimeOffset nowUtc)
+    {
+        while (true)
+        {
+            if (_recentWelcomeByChat.TryGetValue(chatId, out var lastSentUtc))
+            {
+                if (nowUtc - lastSentUtc < WelcomeSendCooldown)
+                    return true;
+
+                if (_recentWelcomeByChat.TryUpdate(chatId, nowUtc, lastSentUtc))
+                    return false;
+
+                continue;
+            }
+
+            if (_recentWelcomeByChat.TryAdd(chatId, nowUtc))
+                return false;
+        }
+    }
 
     private static string BuildChatDisplay(MessageLogRecord record)
     {
@@ -2188,6 +2115,75 @@ public sealed class UpdateHandler : IUpdateHandler
         AppendAiSummary(sb, record, conversationRisk);
 
         return TruncateText(sb.ToString(), 3500);
+    }
+
+    private ModeratorDeliveryEvent BuildFlaggedModeratorDeliveryEvent(
+        MessageLogRecord record,
+        ConversationRiskSnapshot? conversationRisk)
+    {
+        var chatDisplay = BuildChatDisplay(record);
+        var userDisplay = BuildUserDisplay(record);
+        var messageLink = BuildMessageLink(record);
+        var userLink = BuildUserLink(record);
+
+        return new ModeratorDeliveryEvent
+        {
+            Kind = ModeratorDeliveryKind.FlaggedMessage,
+            Record = record,
+            ConversationRisk = conversationRisk,
+            ChatDisplay = chatDisplay,
+            UserDisplay = userDisplay,
+            UserLink = userLink,
+            MessageLink = messageLink,
+            Caption = BuildModerationCaption(record, chatDisplay, userDisplay, messageLink, conversationRisk),
+            Details = BuildModerationDetails(record, chatDisplay, userDisplay, userLink, messageLink, conversationRisk)
+        };
+    }
+
+    private ModeratorDeliveryEvent BuildConversationRiskModeratorDeliveryEvent(
+        MessageLogRecord record,
+        ConversationRiskSnapshot? conversationRisk)
+    {
+        var chatDisplay = BuildChatDisplay(record);
+        var userDisplay = BuildUserDisplay(record);
+        var messageLink = BuildMessageLink(record);
+        var userLink = BuildUserLink(record);
+
+        return new ModeratorDeliveryEvent
+        {
+            Kind = ModeratorDeliveryKind.ConversationRisk,
+            Record = record,
+            ConversationRisk = conversationRisk,
+            ChatDisplay = chatDisplay,
+            UserDisplay = userDisplay,
+            UserLink = userLink,
+            MessageLink = messageLink,
+            Caption = BuildConversationRiskCaption(record, chatDisplay, userDisplay, messageLink, conversationRisk),
+            Details = BuildConversationRiskDetails(record, chatDisplay, userDisplay, userLink, messageLink, conversationRisk)
+        };
+    }
+
+    private async Task TryPublishModeratorDeliveryAsync(
+        ModeratorDeliveryEvent notification,
+        CancellationToken ct)
+    {
+        try
+        {
+            await _moderatorDelivery.PublishAsync(notification, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(
+                ex,
+                "Moderator delivery sink failed for {Kind}; chat={ChatId} msg={MessageId}",
+                notification.Kind,
+                notification.Record.ChatId,
+                notification.Record.MessageId);
+        }
     }
 
     private static void AppendAiSummary(
@@ -2651,14 +2647,11 @@ public sealed class UpdateHandler : IUpdateHandler
 
         var display = BuildRegistryChatDisplay(entry);
         var stateText = isTracked ? "включено" : "отключено";
-        var nextHint = isTracked
-            ? "\nДалее можно получить архив: /admin_dump " + chatId
-            : string.Empty;
 
         await SendPrivateAdminMessageAsync(
             bot,
             message.Chat.Id,
-            $"Тихое отслеживание {stateText} для чата: {display} [id={chatId}].{nextHint}",
+            $"Тихое отслеживание {stateText} для чата: {display} [id={chatId}].",
             ct).ConfigureAwait(false);
     }
 
@@ -2698,52 +2691,7 @@ public sealed class UpdateHandler : IUpdateHandler
         string text,
         CancellationToken ct)
     {
-        if (!TryParseChatIdFromCommand(text, out var chatId))
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Формат: /admin_dump <chat_id>\nПример: /admin_dump -1001234567890", ct).ConfigureAwait(false);
-            return;
-        }
-
-        var entry = await _chatRegistry.GetByChatIdAsync(chatId, ct).ConfigureAwait(false);
-        if (entry is null)
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Чат не найден в реестре.", ct).ConfigureAwait(false);
-            return;
-        }
-
-        if (!entry.IsTracked)
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Для этого чата тихая выгрузка не включена. Сначала выполните /admin_track <chat_id>.", ct).ConfigureAwait(false);
-            return;
-        }
-
-        var display = BuildRegistryChatDisplay(entry);
-        await SendPrivateAdminMessageAsync(bot, message.Chat.Id, $"Готовлю архив сообщений для чата {display} [id={chatId}]...", ct).ConfigureAwait(false);
-
-        try
-        {
-            var result = await _trackedChatExport.ExportAsync(chatId, ct).ConfigureAwait(false);
-            var caption = TruncateText(
-                $"Тихая выгрузка: {display} [id={chatId}]\nСообщений: {result.MessageCount}\nУчастников: {result.ParticipantCount}",
-                900);
-
-            await using var fs = File.OpenRead(result.FilePath);
-            var document = Telegram.Bot.Types.InputFile.FromStream(fs, Path.GetFileName(result.FilePath));
-
-            await bot.SendDocument(
-                chatId: message.Chat.Id,
-                document: document,
-                caption: FormatPrivateAdminCaption(caption),
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            ).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Admin dump failed for chat {ChatId}", chatId);
-
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Не удалось сформировать архив. Проверьте логи сервера и повторите команду.", ct).ConfigureAwait(false);
-        }
+        await SendDisabledExportSurfaceMessageAsync(bot, message.Chat.Id, ct).ConfigureAwait(false);
     }
 
     private async Task HandleAdminParticipantsAsync(
@@ -2858,7 +2806,7 @@ public sealed class UpdateHandler : IUpdateHandler
         }
 
         sb.AppendLine();
-        sb.Append("Архив участников: /admin_participants_dump ");
+        sb.Append("Для продолжения используйте /admin_chat_summary ");
         sb.Append(chatId);
 
         await SendPrivateAdminMessageAsync(bot, message.Chat.Id, TruncateText(sb.ToString(), 3500), ct).ConfigureAwait(false);
@@ -2870,48 +2818,7 @@ public sealed class UpdateHandler : IUpdateHandler
         string text,
         CancellationToken ct)
     {
-        if (message.Chat.Type != ChatType.Private || !IsModerator(message.From?.Id))
-            return;
-
-        if (!TryParseChatIdFromCommand(text, out var chatId))
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Формат: /admin_participants_dump <chat_id>\nПример: /admin_participants_dump -1001234567890", ct).ConfigureAwait(false);
-            return;
-        }
-
-        var entry = await _chatRegistry.GetByChatIdAsync(chatId, ct).ConfigureAwait(false);
-        if (entry is null)
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Чат не найден в реестре.", ct).ConfigureAwait(false);
-            return;
-        }
-
-        await SendPrivateAdminMessageAsync(bot, message.Chat.Id, $"Готовлю архив участников для чата {BuildRegistryChatDisplay(entry)} [id={chatId}]...", ct).ConfigureAwait(false);
-
-        try
-        {
-            var rosterContext = await TryRefreshParticipantRosterAsync(bot, entry, ct).ConfigureAwait(false);
-            var result = await _trackedChatExport.ExportParticipantsAsync(chatId, ct).ConfigureAwait(false);
-            var caption = TruncateText(
-                BuildParticipantsCaption(entry, result.ParticipantCount, rosterContext),
-                900);
-
-            await using var fs = File.OpenRead(result.FilePath);
-            var document = Telegram.Bot.Types.InputFile.FromStream(fs, Path.GetFileName(result.FilePath));
-
-            await bot.SendDocument(
-                chatId: message.Chat.Id,
-                document: document,
-                caption: FormatPrivateAdminCaption(caption),
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            ).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Participants dump failed for chat {ChatId}", chatId);
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Не удалось сформировать архив участников. Проверьте логи сервера.", ct).ConfigureAwait(false);
-        }
+        await SendDisabledExportSurfaceMessageAsync(bot, message.Chat.Id, ct).ConfigureAwait(false);
     }
 
     private async Task HandleAdminFlaggedUsersAsync(
@@ -3017,7 +2924,7 @@ public sealed class UpdateHandler : IUpdateHandler
         sb.AppendLine();
         sb.AppendLine("Команды:");
         sb.AppendLine("/admin_user_chats");
-        sb.Append("/admin_user_dump");
+        sb.Append("/admin_chat_summary");
 
         await SendPrivateAdminMessageAsync(bot, message.Chat.Id, TruncateText(sb.ToString(), 3500), ct).ConfigureAwait(false);
     }
@@ -3074,9 +2981,7 @@ public sealed class UpdateHandler : IUpdateHandler
         }
 
         sb.AppendLine();
-        sb.Append("Выгрузка: /admin_user_dump ");
-        sb.Append(userId);
-        sb.Append(" [chat_id]");
+        sb.Append("Для детализации используйте /admin_chat_summary <chat_id>");
 
         await SendPrivateAdminMessageAsync(bot, message.Chat.Id, TruncateText(sb.ToString(), 3500), ct).ConfigureAwait(false);
     }
@@ -3087,58 +2992,7 @@ public sealed class UpdateHandler : IUpdateHandler
         string text,
         CancellationToken ct)
     {
-        var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length < 2 || !long.TryParse(parts[1], out var userId))
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Формат: /admin_user_dump <user_id> [chat_id]\nПример: /admin_user_dump 123456789 -1001234567890", ct).ConfigureAwait(false);
-            return;
-        }
-
-        long? chatId = null;
-        if (parts.Length >= 3)
-        {
-            if (!long.TryParse(parts[2], out var parsedChatId))
-            {
-                await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "chat_id должен быть целым числом.", ct).ConfigureAwait(false);
-                return;
-            }
-
-            chatId = parsedChatId;
-        }
-
-        await SendPrivateAdminMessageAsync(
-            bot,
-            message.Chat.Id,
-            chatId.HasValue
-                ? $"Готовлю выгрузку пользователя id={userId} по чату {chatId.Value}..."
-                : $"Готовлю выгрузку пользователя id={userId} по всем чатам...",
-            ct).ConfigureAwait(false);
-
-        try
-        {
-            var result = await _trackedChatExport
-                .ExportUserMessagesAsync(userId, chatId, ct)
-                .ConfigureAwait(false);
-
-            var caption = TruncateText(
-                $"Выгрузка пользователя id={userId}\nЧатов: {result.ChatCount}\nСообщений: {result.MessageCount}",
-                900);
-
-            await using var fs = File.OpenRead(result.FilePath);
-            var document = Telegram.Bot.Types.InputFile.FromStream(fs, Path.GetFileName(result.FilePath));
-            await bot.SendDocument(
-                chatId: message.Chat.Id,
-                document: document,
-                caption: FormatPrivateAdminCaption(caption),
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            ).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "User dump failed for user {UserId} chat {ChatId}", userId, chatId);
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Не удалось сформировать выгрузку пользователя. Проверьте логи сервера.", ct).ConfigureAwait(false);
-        }
+        await SendDisabledExportSurfaceMessageAsync(bot, message.Chat.Id, ct).ConfigureAwait(false);
     }
 
     private async Task HandleAdminStartedUsersAsync(
@@ -3214,7 +3068,7 @@ public sealed class UpdateHandler : IUpdateHandler
         }
 
         sb.AppendLine();
-        sb.Append("/admin_started_users_dump");
+        sb.Append("/admin_health");
 
         await SendPrivateAdminMessageAsync(bot, message.Chat.Id, TruncateText(sb.ToString(), 3500), ct).ConfigureAwait(false);
     }
@@ -3224,56 +3078,7 @@ public sealed class UpdateHandler : IUpdateHandler
         Message message,
         CancellationToken ct)
     {
-        var total = await _store.CountPrivateStartUsersAsync(ct).ConfigureAwait(false);
-        if (total <= 0)
-        {
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Пока нет пользователей, которые запускали бота в личной переписке.", ct).ConfigureAwait(false);
-            return;
-        }
-
-        await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Готовлю выгрузку реестра пользователей, запусков в личной переписке...", ct).ConfigureAwait(false);
-
-        try
-        {
-            var users = await _store.GetPrivateStartUsersAsync(ct).ConfigureAwait(false);
-            var exportedAtUtc = DateTimeOffset.UtcNow;
-            var fileName = $"private_start_users_{exportedAtUtc.UtcDateTime:yyyyMMdd_HHmmss}.json";
-            var filePath = Path.Combine(_adminExportsPath, fileName);
-
-            var payload = new
-            {
-                kind = "private_start_users_export",
-                exported_at_utc = exportedAtUtc.UtcDateTime.ToString("O"),
-                total_users = users.Count,
-                users
-            };
-
-            await File.WriteAllTextAsync(
-                filePath,
-                JsonSerializer.Serialize(payload, ExportJsonOptions),
-                Encoding.UTF8,
-                ct).ConfigureAwait(false);
-
-            var caption = TruncateText(
-                $"Реестр запусков бота в личной переписке\nПользователей: {users.Count}",
-                900);
-
-            await using var fs = File.OpenRead(filePath);
-            var document = Telegram.Bot.Types.InputFile.FromStream(fs, Path.GetFileName(filePath));
-
-            await bot.SendDocument(
-                chatId: message.Chat.Id,
-                document: document,
-                caption: FormatPrivateAdminCaption(caption),
-                parseMode: ParseMode.Html,
-                cancellationToken: ct
-            ).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Private start users dump failed");
-            await SendPrivateAdminMessageAsync(bot, message.Chat.Id, "Не удалось сформировать выгрузку пользователей. Проверьте логи сервера.", ct).ConfigureAwait(false);
-        }
+        await SendDisabledExportSurfaceMessageAsync(bot, message.Chat.Id, ct).ConfigureAwait(false);
     }
 
     private async Task HandleAdminHealthAsync(
@@ -3290,6 +3095,8 @@ public sealed class UpdateHandler : IUpdateHandler
         var sb = new StringBuilder();
         sb.AppendLine("Служебное состояние системы");
         sb.AppendLine();
+        sb.Append("Версия: ");
+        sb.AppendLine(BotBuildInfo.DisplayVersion);
         sb.Append("ИИ: ");
         sb.Append(_moderationOpt.Enabled ? "включён" : "выключен");
         sb.Append(" | model=");
@@ -3541,12 +3348,6 @@ public sealed class UpdateHandler : IUpdateHandler
         sb.AppendLine();
         sb.Append("/admin_flagged_users ");
         sb.Append(chatId);
-        if (entry.IsTracked)
-        {
-            sb.AppendLine();
-            sb.Append("/admin_dump ");
-            sb.Append(chatId);
-        }
 
         await SendPrivateAdminMessageAsync(bot, message.Chat.Id, TruncateText(sb.ToString(), 3500), ct).ConfigureAwait(false);
     }
@@ -3957,20 +3758,36 @@ public sealed class UpdateHandler : IUpdateHandler
         sb.AppendLine("/admin_incidents");
         sb.AppendLine("/admin_track");
         sb.AppendLine("/admin_untrack");
-        sb.AppendLine("/admin_dump");
         sb.AppendLine("/admin_participants");
-        sb.AppendLine("/admin_participants_dump");
         sb.AppendLine("/admin_flagged_users");
         sb.AppendLine("/admin_user_chats");
-        sb.AppendLine("/admin_user_dump");
         sb.AppendLine("/admin_started_users");
-        sb.AppendLine("/admin_started_users_dump");
         sb.AppendLine();
         sb.AppendLine("Шаблоны:");
         sb.AppendLine("/admin_chat_summary -1001234567890");
         sb.AppendLine("/admin_incidents -1001234567890 1");
         sb.AppendLine("/admin_track all");
         sb.Append("/admin_untrack all");
+    }
+
+    private static bool IsDisabledExportCommand(string? command)
+    {
+        return string.Equals(command, "/admin_dump", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(command, "/admin_participants_dump", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(command, "/admin_user_dump", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(command, "/admin_started_users_dump", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Task SendDisabledExportSurfaceMessageAsync(
+        ITelegramBotClient bot,
+        long chatId,
+        CancellationToken ct)
+    {
+        return SendPrivateAdminMessageAsync(
+            bot,
+            chatId,
+            "Выгрузки через бота временно недоступны.",
+            ct);
     }
 
     private static bool TryParseChatIdToken(string token, out long chatId)

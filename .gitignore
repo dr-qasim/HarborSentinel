@@ -17,15 +17,22 @@ HarborSentinel.Bot/data/*.jsonl
 HarborSentinel.Bot/data/flagged_lists/*.json
 HarborSentinel.Bot/**/*.log
 HarborSentinel.Bot/data/harborsentinel.db
+HarborSentinel.Bot/data/harborsentinel.db-shm
+HarborSentinel.Bot/data/harborsentinel.db-wal
 HarborSentinel.Bot/data/hadith_daily_settings.json
 HarborSentinel.Bot/data/tracked_exports/
 HarborSentinel.Bot/data/admin_exports/
+HarborSentinel.Bot/data/adminhost_state/
+
+# stray dev artifacts
+HarborSentinel.Bot/AI/*.db
 
 # local analysis inputs
 analysis/moderation_reports/incoming/*.json
 
 # packaged artifacts
 publish/
+artifacts/
 *.tar.gz
 *.tar.gz.sha256
 *.binlog
@@ -33,4 +40,11 @@ publish/
 # local secrets
 HarborSentinel.Bot/appsettings.json
 HarborSentinel.Bot/appsettings.*.local.json
+HarborSentinel.AdminHost/appsettings.Production.json
+HarborSentinel.AdminHost/appsettings.*.local.json
+HarborSentinel.AdminConsole/appsettings.json
+HarborSentinel.AdminConsole/appsettings.*.local.json
 .env
+
+# IDE / tool local settings
+.claude/

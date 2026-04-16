@@ -1,0 +1,727 @@
+<Application x:Class="HarborSentinel.AdminConsole.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:HarborSentinel.AdminConsole.ViewModels"
+             xmlns:views="clr-namespace:HarborSentinel.AdminConsole.Views">
+    <Application.Resources>
+        <Style TargetType="Window">
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+
+        <Style x:Key="CopyInlineButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="Padding" Value="4,1" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Content" Value="⧉" />
+            <Setter Property="FontFamily" Value="Segoe UI Symbol" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="ToolTip" Value="Копировать значение" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Padding" Value="6,3" />
+        </Style>
+
+        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="MinWidth" Value="160" />
+        </Style>
+
+        <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+        </Style>
+
+        <!-- Readonly selectable TextBox for long incident content (message text, AI reason).
+             Used in the IncidentDetailViewModel DataTemplate below. -->
+        <Style x:Key="ReadonlyContentBoxStyle" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+
+        <!-- Карточка инцидента — глобальный DataTemplate, используется в IncidentsView и IncidentCardWindow -->
+        <DataTemplate DataType="{x:Type viewModels:IncidentDetailViewModel}">
+            <StackPanel>
+                <!-- ── Header: chat name + key signals at a glance ── -->
+                <TextBlock Text="{Binding ChatTitle}"
+                           FontSize="16"
+                           FontWeight="SemiBold" />
+
+                <WrapPanel Margin="0,6,0,0" Orientation="Horizontal">
+                    <TextBlock Text="{Binding Label}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding RiskScore, StringFormat=Score: {0}}"
+                               Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding Confidence, StringFormat=Уверенность: {0}}"
+                               Margin="0,0,16,0" />
+                    <TextBlock Text="{Binding TimeUtc}" />
+                </WrapPanel>
+
+                <Separator Margin="0,10,0,10" />
+
+                <!-- ── Context ── -->
+                <TextBlock Text="Контекст"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="ID чата" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                          DisplayText="{Binding ChatId}"
+                                          CopyValue="{Binding ChatId}" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="ID пользователя" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="1" Grid.Column="1"
+                                          DisplayText="{Binding UserId}"
+                                          CopyValue="{Binding UserId}" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Пользователь" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PersonDisplay}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Имя пользователя" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="3" Grid.Column="1"
+                                          DisplayText="{Binding Username}"
+                                          CopyValue="{Binding UsernameCopyValue}" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="ID сообщения" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="4" Grid.Column="1"
+                                          DisplayText="{Binding MessageId}"
+                                          CopyValue="{Binding MessageIdCopyValue}" />
+                </Grid>
+
+                <Separator Margin="0,10,0,10" />
+
+                <!-- ── Assessment ── -->
+                <TextBlock Text="Оценка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Тема" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Topic}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Интент" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Intent}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Нужен review контекста" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding NeedsContextReview}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Контур" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ScopeStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Состояние чата" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ChatActivity}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,10,0,10" />
+
+                <!-- ── Inbox state ── -->
+                <TextBlock Text="Состояние inbox"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Статус" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InboxStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Просмотрен" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SeenAtText}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Подтверждение" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding AcknowledgmentStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Подтверждён в" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AcknowledgedAtText}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,10,0,10" />
+
+                <!-- ── Aggregation ── -->
+                <TextBlock Text="Агрегация"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Сгруппировано событий" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding GroupedCount}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,10,0,10" />
+
+                <!-- ── Trigger message — fixed reading block with its own scroll ── -->
+                <GroupBox Header="Текст сообщения" Margin="0,4,0,0">
+                    <Grid Margin="8">
+                        <TextBox Text="{Binding MessageText, Mode=OneWay}"
+                                 Style="{StaticResource ReadonlyContentBoxStyle}"
+                                 MinHeight="180"
+                                 Height="220" />
+                    </Grid>
+                </GroupBox>
+
+                <!-- ── AI reason — isolated in its own reading block ── -->
+                <GroupBox Header="Причина (AI)" Margin="0,12,0,0">
+                    <Grid Margin="8">
+                        <TextBox Text="{Binding Reason, Mode=OneWay}"
+                                 Style="{StaticResource ReadonlyContentBoxStyle}"
+                                 MinHeight="220"
+                                 Height="280" />
+                    </Grid>
+                </GroupBox>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Карточка пользователя — глобальный DataTemplate, используется в UsersView и UserCardWindow -->
+        <DataTemplate DataType="{x:Type viewModels:UserDetailViewModel}">
+            <StackPanel>
+                <!-- Заголовок -->
+                <TextBlock Text="{Binding DisplayTitle}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <views:CopyValueBlock Margin="0,6,0,0"
+                                      DisplayText="{Binding UserId, StringFormat=ID пользователя: {0}}"
+                                      CopyValue="{Binding UserId}" />
+
+                <!-- Основные сведения -->
+                <TextBlock Margin="0,16,0,0"
+                           Text="Основные сведения"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Имя пользователя" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                          DisplayText="{Binding Username}"
+                                          CopyValue="{Binding UsernameCopyValue}"
+                                          TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Имя" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FirstName}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Фамилия" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastName}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Контур" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ScopeStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Область данных" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ScopeMode}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,14,0,14" />
+
+                <!-- Private-start -->
+                <TextBlock Text="Private-start"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PrivateStartStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Телефон" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PhoneStatus}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Первый /start" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding StartedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Последний /start" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LastStartedAtUtc}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Количество запусков" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StartCount}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,14,0,14" />
+
+                <!-- Активность и сигналы -->
+                <TextBlock Text="Активность и сигналы"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Чатов" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ChatCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Сообщений" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MessageCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Flagged-событий" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FlaggedEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Risk-событий" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding RiskEventCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Последняя активность" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding LastActivityUtc}" TextWrapping="Wrap" />
+                </Grid>
+
+                <Separator Margin="0,14,0,14" />
+
+                <!-- Связанные чаты -->
+                <TextBlock Text="Связанные чаты"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <DataGrid ItemsSource="{Binding Chats}"
+                          AutoGenerateColumns="False"
+                          MinHeight="120"
+                          MaxHeight="340"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Название" Binding="{Binding DisplayTitle}" Width="1.8*" />
+                        <DataGridTemplateColumn Header="ID чата" Width="1.15*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <views:CopyValueBlock DisplayText="{Binding ChatId}"
+                                                          CopyValue="{Binding ChatId}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Имя пользователя" Width="1*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <views:CopyValueBlock DisplayText="{Binding Username}"
+                                                          CopyValue="{Binding UsernameCopyValue}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Контур" Binding="{Binding ScopeStatus}" Width="1.1*" />
+                        <DataGridTextColumn Header="Отслеживается" Binding="{Binding Tracked}" Width="0.9*" />
+                        <DataGridTextColumn Header="Активен" Binding="{Binding Active}" Width="0.85*" />
+                        <DataGridTextColumn Header="Сообщений" Binding="{Binding MessageCount}" Width="0.85*" />
+                        <DataGridTextColumn Header="Flagged" Binding="{Binding FlaggedEventCount}" Width="0.8*" />
+                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskEventCount}" Width="0.8*" />
+                        <DataGridTextColumn Header="Последнее наблюдение (UTC)" Binding="{Binding LastSeenUtc}" Width="1.35*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: flagged dialog -->
+        <DataTemplate DataType="{x:Type viewModels:FlaggedDialogContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+
+                <TextBlock Margin="0,14,0,0"
+                           Text="Сводка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Чат" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ChatDisplay}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Пользователь" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SubjectDisplay}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="ID пользователя" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="2" Grid.Column="1"
+                                          DisplayText="{Binding UserId}"
+                                          CopyValue="{Binding UserId}" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Метка / уверенность" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LabelSummary}" />
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Причина" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox Grid.Row="4" Grid.Column="1"
+                             Text="{Binding Reason}"
+                             Style="{StaticResource ReadonlyContentBoxStyle}"
+                             MaxHeight="180" />
+                </Grid>
+
+                <TextBlock Margin="0,14,0,8"
+                           Text="Диалог"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <ListBox ItemsSource="{Binding Messages}"
+                         MaxHeight="600"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         BorderThickness="0"
+                         Background="Transparent">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8"
+                                    Padding="10"
+                                    BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                                    BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSubjectUser}" Value="True">
+                                                <Setter Property="Background" Value="#14007ACC" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{Binding AuthorDisplay}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock DockPanel.Dock="Right"
+                                                   Text="{Binding Timestamp}"
+                                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                                    </DockPanel>
+                                    <TextBox Margin="0,8,0,0"
+                                             Text="{Binding Text}"
+                                             Style="{StaticResource ReadonlyContentBoxStyle}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: сообщения чата -->
+        <DataTemplate DataType="{x:Type viewModels:ChatMessagesContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <TextBlock Margin="0,14,0,0"
+                           Text="Сводка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Чат" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ChatDisplay}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Экспортирован" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ExportedAt}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Сообщений / участников" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CountsSummary}" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Завершено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CompletedAt}" TextWrapping="Wrap" />
+                </Grid>
+
+                <TextBlock Margin="0,14,0,8"
+                           Text="Сообщения"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <DataGrid ItemsSource="{Binding Messages}"
+                          AutoGenerateColumns="False"
+                          MaxHeight="520"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Время" Binding="{Binding TimestampUtc}" Width="1.1*" />
+                        <DataGridTextColumn Header="Пользователь" Binding="{Binding UserDisplay}" Width="1.3*" />
+                        <DataGridTextColumn Header="ID сообщения" Binding="{Binding MessageId}" Width="0.9*" />
+                        <DataGridTextColumn Header="Текст" Binding="{Binding Text}" Width="3.2*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: участники -->
+        <DataTemplate DataType="{x:Type viewModels:ParticipantsContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <TextBlock Margin="0,14,0,0"
+                           Text="Сводка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Чат" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                          DisplayText="{Binding ChatDisplay}"
+                                          CopyValue="{Binding ChatId}" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Экспортирован" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ExportedAt}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Участники / админы / боты" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CountsSummary}" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Завершено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CompletedAt}" TextWrapping="Wrap" />
+                </Grid>
+
+                <TextBlock Margin="0,14,0,8"
+                           Text="Реестр участников"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <DataGrid ItemsSource="{Binding Participants}"
+                          AutoGenerateColumns="False"
+                          MaxHeight="520"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="ID" Binding="{Binding UserId}" Width="0.95*" />
+                        <DataGridTextColumn Header="Username" Binding="{Binding Username}" Width="1*" />
+                        <DataGridTextColumn Header="Имя" Binding="{Binding FirstName}" Width="0.95*" />
+                        <DataGridTextColumn Header="Фамилия" Binding="{Binding LastName}" Width="0.95*" />
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="0.95*" />
+                        <DataGridTextColumn Header="Admin" Binding="{Binding IsAdmin}" Width="0.7*" />
+                        <DataGridTextColumn Header="Bot" Binding="{Binding IsBot}" Width="0.7*" />
+                        <DataGridTextColumn Header="Сообщений" Binding="{Binding MessageCount}" Width="0.8*" />
+                        <DataGridTextColumn Header="Первое наблюдение" Binding="{Binding FirstSeenUtc}" Width="1.1*" />
+                        <DataGridTextColumn Header="Последнее наблюдение" Binding="{Binding LastSeenUtc}" Width="1.1*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: сообщения пользователя -->
+        <DataTemplate DataType="{x:Type viewModels:UserMessagesContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <TextBlock Margin="0,14,0,0"
+                           Text="Сводка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Пользователь" Style="{StaticResource FieldLabelStyle}" />
+                    <views:CopyValueBlock Grid.Row="0" Grid.Column="1"
+                                          DisplayText="{Binding UserId}"
+                                          CopyValue="{Binding UserId}" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Область" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ChatScope}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Сообщений / чатов" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CountsSummary}" />
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Завершено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CompletedAt}" TextWrapping="Wrap" />
+                </Grid>
+
+                <TextBlock Margin="0,14,0,8"
+                           Text="Сообщения"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <DataGrid ItemsSource="{Binding Messages}"
+                          AutoGenerateColumns="False"
+                          MaxHeight="520"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Время" Binding="{Binding TimestampUtc}" Width="1.1*" />
+                        <DataGridTextColumn Header="Чат" Binding="{Binding ChatDisplay}" Width="1.4*" />
+                        <DataGridTextColumn Header="Flagged" Binding="{Binding IsFlagged}" Width="0.75*" />
+                        <DataGridTextColumn Header="Метка" Binding="{Binding FlagLabel}" Width="1*" />
+                        <DataGridTextColumn Header="Текст" Binding="{Binding Text}" Width="3.1*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: private-start -->
+        <DataTemplate DataType="{x:Type viewModels:StartedUsersContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+                <TextBlock Margin="0,14,0,0"
+                           Text="Сводка"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Экспортирован" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ExportedAt}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Пользователей" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding UserCount}" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Завершено" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CompletedAt}" TextWrapping="Wrap" />
+                </Grid>
+
+                <TextBlock Margin="0,14,0,8"
+                           Text="Пользователи"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <DataGrid ItemsSource="{Binding Users}"
+                          AutoGenerateColumns="False"
+                          MaxHeight="520"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="ID" Binding="{Binding UserId}" Width="0.95*" />
+                        <DataGridTextColumn Header="Username" Binding="{Binding Username}" Width="1*" />
+                        <DataGridTextColumn Header="Имя" Binding="{Binding FirstName}" Width="0.95*" />
+                        <DataGridTextColumn Header="Фамилия" Binding="{Binding LastName}" Width="0.95*" />
+                        <DataGridTextColumn Header="Телефон" Binding="{Binding PhoneMasked}" Width="1*" />
+                        <DataGridTextColumn Header="Есть телефон" Binding="{Binding HasPhone}" Width="0.85*" />
+                        <DataGridTextColumn Header="Запусков" Binding="{Binding StartCount}" Width="0.8*" />
+                        <DataGridTextColumn Header="Первый /start" Binding="{Binding StartedAt}" Width="1.1*" />
+                        <DataGridTextColumn Header="Последний /start" Binding="{Binding LastStartedAt}" Width="1.1*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Просмотрщик выгрузки: raw fallback -->
+        <DataTemplate DataType="{x:Type viewModels:RawJsonContent}">
+            <StackPanel>
+                <TextBlock Text="{Binding TypeLabel}"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+
+                <TextBlock Margin="0,14,0,0"
+                           Text="Файл"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <views:CopyValueBlock DisplayText="{Binding FileName}"
+                                      CopyValue="{Binding FilePath}"
+                                      TextWrapping="Wrap" />
+
+                <TextBlock Margin="0,14,0,0"
+                           Text="Ошибка чтения">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource SectionTitleTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasError}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBox Margin="0,0,0,12"
+                         Text="{Binding ErrorMessage}"
+                         MaxHeight="120">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource ReadonlyContentBoxStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasError}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <TextBlock Text="Raw JSON"
+                           Style="{StaticResource SectionTitleTextStyle}" />
+                <TextBox Text="{Binding Json}"
+                         Style="{StaticResource ReadonlyContentBoxStyle}"
+                         HorizontalScrollBarVisibility="Auto"
+                         MinHeight="420" />
+            </StackPanel>
+        </DataTemplate>
+
+    </Application.Resources>
+</Application>

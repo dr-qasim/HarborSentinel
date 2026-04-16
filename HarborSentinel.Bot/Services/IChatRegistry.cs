@@ -5,6 +5,7 @@ namespace HarborSentinel.Bot.Services;
 public interface IChatRegistry
 {
     Task InitAsync(CancellationToken ct);
+    Task ApplyCurrentBotIdentityAsync(long botId, CancellationToken ct);
     Task UpsertAsync(ChatRegistryUpdate update, CancellationToken ct);
     Task<ChatRegistryEntry?> GetByChatIdAsync(long chatId, CancellationToken ct);
     Task<bool> SetTrackedAsync(long chatId, bool isTracked, CancellationToken ct);

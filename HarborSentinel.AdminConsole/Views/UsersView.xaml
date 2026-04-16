@@ -1,0 +1,191 @@
+<UserControl x:Class="HarborSentinel.AdminConsole.Views.UsersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:HarborSentinel.AdminConsole.Views"
+             mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,8">
+
+            <!-- Фильтры -->
+            <GroupBox Header="Фильтры">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="250" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="Источник выборки" Style="{StaticResource FieldLabelStyle}" />
+                        <ComboBox ItemsSource="{Binding SourceFilters}"
+                                  SelectedItem="{Binding SelectedSourceFilter}"
+                                  DisplayMemberPath="Label" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="Поиск по ID, username, имени и фамилии" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Можно искать по ID пользователя, username, имени и фамилии." />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Button Command="{Binding RefreshCommand}" Content="Обновить список" />
+                        <Button Content="Открыть карточку"
+                                IsEnabled="{Binding HasSelectedRow}"
+                                Click="OnOpenUserCardClick"
+                                ToolTip="Открыть полную карточку выбранного пользователя (также двойной щелчок по строке)" />
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Сводка -->
+            <GroupBox Header="Сводка по пользователям">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние запроса" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Область данных" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ScopeSummary}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Итоги" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CountsSummary}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Запрос" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding QuerySummary}" TextWrapping="Wrap" />
+                </Grid>
+            </GroupBox>
+
+            <!-- Реестр пользователей — полная ширина -->
+            <GroupBox Header="Реестр пользователей">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding LastUpdated, StringFormat=Последнее обновление: {0}}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="Двойной щелчок по строке открывает карточку"
+                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Rows}"
+                              SelectedItem="{Binding SelectedRow}"
+                              AutoGenerateColumns="False"
+                              SelectionMode="Single"
+                              MinHeight="380"
+                              MouseDoubleClick="OnUserRowDoubleClick">
+                        <DataGrid.Columns>
+                            <!-- Пользователь — основной идентификатор, широкий -->
+                            <DataGridTextColumn Header="Пользователь"
+                                               Binding="{Binding DisplayName}"
+                                               Width="2*"
+                                               MinWidth="140" />
+
+                            <!-- ID — copyable -->
+                            <DataGridTemplateColumn Header="ID пользователя" Width="1.1*" MinWidth="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <views:CopyValueBlock DisplayText="{Binding UserId}"
+                                                              CopyValue="{Binding UserId}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Username — copyable -->
+                            <DataGridTemplateColumn Header="Username" Width="1.2*" MinWidth="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <views:CopyValueBlock DisplayText="{Binding Username}"
+                                                              CopyValue="{Binding UsernameCopyValue}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Контур -->
+                            <DataGridTextColumn Header="Контур"
+                                               Binding="{Binding ScopeStatus}"
+                                               Width="1.1*"
+                                               MinWidth="100" />
+
+                            <!-- Private-start -->
+                            <DataGridTextColumn Header="Private-start"
+                                               Binding="{Binding PrivateStartStatus}"
+                                               Width="0.95*"
+                                               MinWidth="80" />
+
+                            <!-- Телефон -->
+                            <DataGridTextColumn Header="Телефон"
+                                               Binding="{Binding PhoneStatus}"
+                                               Width="0.8*"
+                                               MinWidth="70" />
+
+                            <!-- Чатов -->
+                            <DataGridTextColumn Header="Чатов"
+                                               Binding="{Binding ChatCount}"
+                                               Width="0.65*"
+                                               MinWidth="60" />
+
+                            <!-- Сообщений -->
+                            <DataGridTextColumn Header="Сообщений"
+                                               Binding="{Binding MessageCount}"
+                                               Width="0.75*"
+                                               MinWidth="70" />
+
+                            <!-- Flagged -->
+                            <DataGridTextColumn Header="Flagged"
+                                               Binding="{Binding FlaggedEventCount}"
+                                               Width="0.65*"
+                                               MinWidth="60" />
+
+                            <!-- Risk -->
+                            <DataGridTextColumn Header="Risk"
+                                               Binding="{Binding RiskEventCount}"
+                                               Width="0.65*"
+                                               MinWidth="60" />
+
+                            <!-- Последняя активность -->
+                            <DataGridTextColumn Header="Последняя активность (UTC)"
+                                               Binding="{Binding LastActivityUtc}"
+                                               Width="1.4*"
+                                               MinWidth="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GroupBox Grid.Row="2" Margin="0,12,0,0" Header="{Binding WarningsHeadline}">
+                        <Grid Margin="8">
+                            <ListBox ItemsSource="{Binding Warnings}" MinHeight="70" />
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </GroupBox>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

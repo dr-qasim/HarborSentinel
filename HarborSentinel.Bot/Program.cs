@@ -59,6 +59,7 @@ public class Program
 
               services.AddSingleton<IFlaggedDialogExporter, FlaggedDialogExporter>();
               services.AddSingleton<ITrackedChatExportService, TrackedChatExportService>();
+              services.AddSingleton<IModeratorDeliverySink, QuietModeratorDeliverySink>();
               services.AddSingleton<IModerationService, DeepSeekModerationService>();
 
               services.AddSingleton<IAuditSink, JsonlAuditSink>();

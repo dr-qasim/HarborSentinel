@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using HarborSentinel.Bot.Options;
 using Microsoft.Data.Sqlite;
@@ -17,7 +18,8 @@ public sealed class TrackedChatExportService : ITrackedChatExportService
     private static readonly JsonSerializerOptions JsonOpt = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false
+        WriteIndented = false,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
     public TrackedChatExportService(

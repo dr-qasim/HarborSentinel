@@ -3,6 +3,7 @@ using HarborSentinel.Bot.Options;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace HarborSentinel.Bot.Services;
 
@@ -34,9 +35,15 @@ CREATE TABLE IF NOT EXISTS chat_registry(
   status          TEXT,
   is_active       INTEGER NOT NULL,
   is_tracked      INTEGER NOT NULL DEFAULT 0,
+  is_listed       INTEGER NOT NULL DEFAULT 1,
   first_seen_utc  TEXT    NOT NULL,
   last_seen_utc   TEXT    NOT NULL,
   removed_utc     TEXT,
+  updated_utc     TEXT    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chat_registry_meta(
+  key             TEXT    PRIMARY KEY,
+  value           TEXT    NOT NULL,
   updated_utc     TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_chat_registry_active
@@ -44,11 +51,49 @@ ON chat_registry(is_active);
 CREATE INDEX IF NOT EXISTS ix_chat_registry_tracked_last_seen
 ON chat_registry(is_tracked, last_seen_utc DESC);
 CREATE INDEX IF NOT EXISTS ix_chat_registry_last_seen
-ON chat_registry(last_seen_utc);";
+ON chat_registry(last_seen_utc);
+CREATE INDEX IF NOT EXISTS ix_chat_registry_listed_last_seen
+ON chat_registry(is_listed, last_seen_utc DESC);";
         await cmd.ExecuteNonQueryAsync(ct);
 
         await EnsureTrackedColumnAsync(c, ct).ConfigureAwait(false);
+        await EnsureListedColumnAsync(c, ct).ConfigureAwait(false);
         _log.LogInformation("Chat registry ready at {Path}", Path.GetFullPath(_dbPath));
+    }
+
+    public async Task ApplyCurrentBotIdentityAsync(long botId, CancellationToken ct)
+    {
+        await using var c = Open();
+        await using var tx = (SqliteTransaction)await c.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+        var currentBotId = botId.ToString(CultureInfo.InvariantCulture);
+        var storedBotId = await GetMetaValueAsync(c, tx, "current_bot_id", ct).ConfigureAwait(false);
+
+        if (!string.Equals(storedBotId, currentBotId, StringComparison.Ordinal))
+        {
+            var hiddenCount = 0;
+
+            await using (var hideCmd = c.CreateCommand())
+            {
+                hideCmd.Transaction = tx;
+                hideCmd.CommandText = @"
+UPDATE chat_registry
+SET is_listed = 0
+WHERE is_listed <> 0;";
+                hiddenCount = await hideCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+
+            await SetMetaValueAsync(c, tx, "current_bot_id", currentBotId, ct).ConfigureAwait(false);
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+
+            _log.LogInformation(
+                "Chat registry scope switched to bot {BotId}; hidden {HiddenCount} legacy chats",
+                botId,
+                hiddenCount);
+            return;
+        }
+
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpsertAsync(ChatRegistryUpdate update, CancellationToken ct)
@@ -58,9 +103,9 @@ ON chat_registry(last_seen_utc);";
         cmd.CommandText = @"
 INSERT INTO chat_registry(
   chat_id, chat_title, chat_username, chat_type, status,
-  is_active, first_seen_utc, last_seen_utc, removed_utc, updated_utc
+  is_active, is_listed, first_seen_utc, last_seen_utc, removed_utc, updated_utc
 )
-VALUES($id, $title, $username, $type, $status, $active, $first, $last, $removed, $updated)
+VALUES($id, $title, $username, $type, $status, $active, 1, $first, $last, $removed, $updated)
 ON CONFLICT(chat_id) DO UPDATE SET
   chat_title = COALESCE(excluded.chat_title, chat_registry.chat_title),
   chat_username = COALESCE(excluded.chat_username, chat_registry.chat_username),
@@ -70,6 +115,7 @@ ON CONFLICT(chat_id) DO UPDATE SET
              ELSE chat_registry.status
            END,
   is_active = excluded.is_active,
+  is_listed = 1,
   last_seen_utc = excluded.last_seen_utc,
   removed_utc = CASE WHEN excluded.is_active = 1 THEN NULL ELSE excluded.removed_utc END,
   updated_utc = excluded.updated_utc
@@ -102,6 +148,7 @@ SELECT chat_id, chat_title, chat_username, chat_type, status,
        is_active, is_tracked, first_seen_utc, last_seen_utc, removed_utc
 FROM chat_registry
 WHERE chat_id = $id
+  AND is_listed = 1
 LIMIT 1;";
         cmd.Parameters.AddWithValue("$id", chatId);
 
@@ -119,7 +166,8 @@ LIMIT 1;";
         cmd.CommandText = @"
 UPDATE chat_registry
 SET is_tracked = $tracked
-WHERE chat_id = $id;";
+WHERE chat_id = $id
+  AND is_listed = 1;";
 
         cmd.Parameters.AddWithValue("$tracked", isTracked ? 1 : 0);
         cmd.Parameters.AddWithValue("$id", chatId);
@@ -135,10 +183,10 @@ WHERE chat_id = $id;";
 
         var where = filter switch
         {
-            ChatRegistryFilter.Active => "WHERE is_active = 1",
-            ChatRegistryFilter.Removed => "WHERE is_active = 0",
-            ChatRegistryFilter.Tracked => "WHERE is_tracked = 1",
-            _ => string.Empty
+            ChatRegistryFilter.Active => "WHERE is_listed = 1 AND is_active = 1",
+            ChatRegistryFilter.Removed => "WHERE is_listed = 1 AND is_active = 0",
+            ChatRegistryFilter.Tracked => "WHERE is_listed = 1 AND is_tracked = 1",
+            _ => "WHERE is_listed = 1"
         };
 
         cmd.CommandText = $@"
@@ -157,10 +205,10 @@ SET is_tracked = $tracked
         await using var cmd = c.CreateCommand();
         cmd.CommandText = filter switch
         {
-            ChatRegistryFilter.Active => "SELECT COUNT(1) FROM chat_registry WHERE is_active = 1;",
-            ChatRegistryFilter.Removed => "SELECT COUNT(1) FROM chat_registry WHERE is_active = 0;",
-            ChatRegistryFilter.Tracked => "SELECT COUNT(1) FROM chat_registry WHERE is_tracked = 1;",
-            _ => "SELECT COUNT(1) FROM chat_registry;"
+            ChatRegistryFilter.Active => "SELECT COUNT(1) FROM chat_registry WHERE is_listed = 1 AND is_active = 1;",
+            ChatRegistryFilter.Removed => "SELECT COUNT(1) FROM chat_registry WHERE is_listed = 1 AND is_active = 0;",
+            ChatRegistryFilter.Tracked => "SELECT COUNT(1) FROM chat_registry WHERE is_listed = 1 AND is_tracked = 1;",
+            _ => "SELECT COUNT(1) FROM chat_registry WHERE is_listed = 1;"
         };
 
         var result = await cmd.ExecuteScalarAsync(ct);
@@ -178,10 +226,10 @@ SET is_tracked = $tracked
 
         var where = filter switch
         {
-            ChatRegistryFilter.Active => "WHERE is_active = 1",
-            ChatRegistryFilter.Removed => "WHERE is_active = 0",
-            ChatRegistryFilter.Tracked => "WHERE is_tracked = 1",
-            _ => string.Empty
+            ChatRegistryFilter.Active => "WHERE is_listed = 1 AND is_active = 1",
+            ChatRegistryFilter.Removed => "WHERE is_listed = 1 AND is_active = 0",
+            ChatRegistryFilter.Tracked => "WHERE is_listed = 1 AND is_tracked = 1",
+            _ => "WHERE is_listed = 1"
         };
 
         await using var c = Open();
@@ -220,6 +268,60 @@ LIMIT $lim OFFSET $off;";
         await using var indexCmd = connection.CreateCommand();
         indexCmd.CommandText = "CREATE INDEX IF NOT EXISTS ix_chat_registry_tracked_last_seen ON chat_registry(is_tracked, last_seen_utc DESC);";
         await indexCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    private async Task EnsureListedColumnAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        if (!await HasColumnAsync(connection, "chat_registry", "is_listed", ct).ConfigureAwait(false))
+        {
+            await using var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE chat_registry ADD COLUMN is_listed INTEGER NOT NULL DEFAULT 1;";
+            await alterCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        await using var indexCmd = connection.CreateCommand();
+        indexCmd.CommandText = "CREATE INDEX IF NOT EXISTS ix_chat_registry_listed_last_seen ON chat_registry(is_listed, last_seen_utc DESC);";
+        await indexCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    private static async Task<string?> GetMetaValueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string key,
+        CancellationToken ct)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = @"
+SELECT value
+FROM chat_registry_meta
+WHERE key = $key
+LIMIT 1;";
+        cmd.Parameters.AddWithValue("$key", key);
+
+        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return result as string;
+    }
+
+    private static async Task SetMetaValueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string key,
+        string value,
+        CancellationToken ct)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = @"
+INSERT INTO chat_registry_meta(key, value, updated_utc)
+VALUES($key, $value, $updated)
+ON CONFLICT(key) DO UPDATE SET
+  value = excluded.value,
+  updated_utc = excluded.updated_utc;";
+        cmd.Parameters.AddWithValue("$key", key);
+        cmd.Parameters.AddWithValue("$value", value);
+        cmd.Parameters.AddWithValue("$updated", DateTimeOffset.UtcNow.UtcDateTime.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     private static async Task<bool> HasColumnAsync(

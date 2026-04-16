@@ -799,9 +799,10 @@ namespace HarborSentinel.Bot.AI
 
                 var label = normalizedRawLabel!;
                 var confidence = NormalizeConfidence(cls.Confidence);
-                var reason = string.IsNullOrWhiteSpace(cls.Reasons)
+                var rawReason = string.IsNullOrWhiteSpace(cls.Reasons)
                     ? $"model={model}; label={label}, confidence={confidence:F2}"
                     : cls.Reasons;
+                var reason = TextSanitizer.NormalizeReasonText(rawReason, maxLen: 360);
                 var topic = NormalizeToken(cls.Topic, AllowedTopics, TopicAliases, fallback: "unknown") ?? "unknown";
                 var intent = NormalizeToken(cls.Intent, AllowedIntents, IntentAliases, fallback: "unclear") ?? "unclear";
                 var stance = NormalizeToken(cls.Stance, AllowedStances, StanceAliases, fallback: "unclear") ?? "unclear";
@@ -1316,9 +1317,10 @@ namespace HarborSentinel.Bot.AI
             if (profile.CurrentMessageLooksWeakFollowUp && !profile.CurrentMessageHasStrongSignals)
                 prefix += " Текущее сообщение короткое и само по себе не содержит сильного нового сигнала.";
 
-            var modelPart = string.IsNullOrWhiteSpace(modelReason)
+            var normalizedModelReason = TextSanitizer.NormalizeReasonText(modelReason, maxLen: 260);
+            var modelPart = string.IsNullOrWhiteSpace(normalizedModelReason)
                 ? string.Empty
-                : $" Модель: {modelReason.Trim()}";
+                : $" Модель: {normalizedModelReason}";
 
             return $"{prefix} Выявлены сигналы: {string.Join(", ", tags)}. " +
                    $"Ключевые реплики: {evidence}. " +
@@ -1327,10 +1329,7 @@ namespace HarborSentinel.Bot.AI
 
         private static string NormalizeEvidenceLine(string value)
         {
-            var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
-            if (normalized.Length > 120)
-                normalized = normalized[..120].TrimEnd() + "…";
-            return normalized;
+            return TextSanitizer.NormalizeReasonText(value, maxLen: 120);
         }
 
         private static string MaxRisk(string current, string candidate)
@@ -1378,7 +1377,10 @@ namespace HarborSentinel.Bot.AI
             }
             catch (Exception ex)
             {
-                _log.LogWarning(ex, "LLM returned non-JSON content: {Content}", content);
+                _log.LogWarning(
+                    ex,
+                    "LLM returned non-JSON content; snippet={ContentSnippet}",
+                    TextSanitizer.CreateSafeLogSnippet(content, maxLen: 220));
             }
 
             // Fallback: выдернем поля регэкспами из «полу-JSON»

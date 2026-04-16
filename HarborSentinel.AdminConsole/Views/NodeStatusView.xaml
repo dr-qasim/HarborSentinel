@@ -1,0 +1,118 @@
+<UserControl x:Class="HarborSentinel.AdminConsole.Views.NodeStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,8">
+            <GroupBox Header="Узел и безопасность">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Статус" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                    <Button Grid.Row="0" Grid.Column="2" Margin="12,0,0,0" Command="{Binding RefreshCommand}" Content="Обновить" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Узел" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding NodeSummary}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Безопасность" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SecuritySummary}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Schema / runtime" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding SchemaSummary}" TextWrapping="Wrap" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Последнее обновление" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding LastUpdated}" TextWrapping="Wrap" />
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Компоненты">
+                <Grid Margin="8">
+                    <DataGrid ItemsSource="{Binding Components}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Компонент" Binding="{Binding Label}" Width="180" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
+                            <DataGridTextColumn Header="Сводка" Binding="{Binding Summary}" Width="*" />
+                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="260" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Пути и хранилища">
+                <Grid Margin="8">
+                    <DataGrid ItemsSource="{Binding Paths}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding Label}" Width="160" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
+                            <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="90" />
+                            <DataGridTextColumn Header="Доступ" Binding="{Binding Access}" Width="180" />
+                            <DataGridTextColumn Header="Полный путь" Binding="{Binding FullPath}" Width="*" />
+                            <DataGridTextColumn Header="Сводка" Binding="{Binding Summary}" Width="260" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Runtime schema">
+                <Grid Margin="8">
+                    <DataGrid ItemsSource="{Binding RuntimeTables}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Таблица" Binding="{Binding TableName}" Width="170" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
+                            <DataGridTextColumn Header="Есть" Binding="{Binding Exists}" Width="70" />
+                            <DataGridTextColumn Header="Missing columns" Binding="{Binding MissingColumns}" Width="220" />
+                            <DataGridTextColumn Header="Сводка" Binding="{Binding Summary}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Capability / degraded-state">
+                <Grid Margin="8">
+                    <DataGrid ItemsSource="{Binding Capabilities}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Экран" Binding="{Binding Label}" Width="150" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
+                            <DataGridTextColumn Header="Сводка" Binding="{Binding Summary}" Width="*" />
+                            <DataGridTextColumn Header="Влияние" Binding="{Binding Impact}" Width="320" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox Header="Последние проблемы">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="{Binding IssueSummary}" TextWrapping="Wrap" />
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding RecentIssues}" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Время" Binding="{Binding Timestamp}" Width="170" />
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
+                            <DataGridTextColumn Header="Источник" Binding="{Binding Source}" Width="260" />
+                            <DataGridTextColumn Header="Сообщение" Binding="{Binding Message}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </GroupBox>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

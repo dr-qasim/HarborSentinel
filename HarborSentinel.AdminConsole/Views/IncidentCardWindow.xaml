@@ -1,0 +1,73 @@
+<Window x:Class="HarborSentinel.AdminConsole.Views.IncidentCardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Width="940"
+        Height="800"
+        MinWidth="640"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False">
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Статус-бар с кнопкой закрытия -->
+            <RowDefinition Height="Auto" />
+            <!-- Содержимое карточки -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Статус-бар -->
+        <Border Grid.Row="0"
+                Padding="14,10"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding DetailStatus}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap" />
+
+                <Button Grid.Column="1"
+                        Content="Закрыть"
+                        Click="OnCloseClick"
+                        VerticalAlignment="Center"
+                        Margin="0,0,0,0" />
+            </Grid>
+        </Border>
+
+        <!-- Карточка инцидента -->
+        <ScrollViewer Grid.Row="1"
+                      Padding="16,14,16,14"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Показывается, пока инцидент не выбран (не должно происходить при нормальном открытии) -->
+                <TextBlock Text="Инцидент не выбран."
+                           FontStyle="Italic"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedIncidentDetail}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Карточка инцидента (DataTemplate из App.xaml применяется автоматически) -->
+                <ContentControl Content="{Binding SelectedIncidentDetail}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

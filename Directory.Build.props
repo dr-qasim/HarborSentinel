@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <VersionPrefix>2026.4.16</VersionPrefix>
+    <AssemblyVersion>2026.4.16.0</AssemblyVersion>
+    <FileVersion>2026.4.16.0</FileVersion>
+    <InformationalVersion>2026.4.16</InformationalVersion>
+    <Product>HarborSentinel</Product>
+    <Company>HarborSentinel</Company>
+  </PropertyGroup>
+</Project>

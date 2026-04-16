@@ -1,0 +1,215 @@
+<UserControl x:Class="HarborSentinel.AdminConsole.Views.IncidentsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:HarborSentinel.AdminConsole.Views"
+             mc:Ignorable="d">
+    <!--
+        Root Grid: 3 rows.
+          Row 0 — Filters (compact, never scrolls)
+          Row 1 — Status bar (connection status + read-state + action buttons)
+          Row 2 — Full-width incident list (fills remaining window height)
+
+        The detail card has been moved to a separate IncidentCardWindow,
+        following the same pattern as the Users screen and UserCardWindow.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ══ Row 0: Filters ══ -->
+        <GroupBox Grid.Row="0" Header="Фильтры">
+            <Grid Margin="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="175" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="195" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="175" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Окно обзора" Style="{StaticResource FieldLabelStyle}" />
+                    <ComboBox ItemsSource="{Binding RecentWindows}"
+                              SelectedItem="{Binding SelectedWindow}"
+                              DisplayMemberPath="Label" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="ID чата" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox Text="{Binding ChatIdFilterText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Можно указать конкретный ID чата. Некорректное значение будет проигнорировано с предупреждением." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="Критичность" Style="{StaticResource FieldLabelStyle}" />
+                    <ComboBox ItemsSource="{Binding SeverityFilters}"
+                              SelectedItem="{Binding SelectedSeverityFilter}"
+                              DisplayMemberPath="Label"
+                              ToolTip="Клиентский фильтр по уровню риска. Не требует перезагрузки ленты." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="6">
+                    <TextBlock Text="Поиск" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Клиентский поиск по названию чата, имени пользователя или метке." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="8" VerticalAlignment="Bottom" Orientation="Horizontal">
+                    <Button Command="{Binding RefreshCommand}"
+                            Content="Обновить ленту" />
+                    <Button Content="Открыть карточку"
+                            IsEnabled="{Binding HasSelectedIncident}"
+                            Click="OnOpenIncidentCardClick"
+                            ToolTip="Открыть полную карточку выбранного инцидента (также двойной щелчок по строке)" />
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ══ Row 1: Compact status + actions ══ -->
+        <Border Grid.Row="1"
+                Padding="4,4,4,8"
+                Margin="0,0,0,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="{Binding ConnectionStatus}"
+                           TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Margin="0,2,12,0"
+                           Text="{Binding ReviewStateSummary}"
+                           TextWrapping="Wrap" />
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Margin="0,0,12,0"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="{Binding UnreadIndicatorText}" />
+                    <Button Command="{Binding MarkUnreadAsSeenCommand}"
+                            Content="Отметить просмотренными" />
+                    <Button Command="{Binding AcknowledgeSelectedCommand}"
+                            Content="Подтвердить разбор" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ Row 2: Full-width incident list ══ -->
+        <GroupBox Grid.Row="2" Header="Лента инцидентов" Margin="0">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Action bar -->
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Text="{Binding LastUpdated, StringFormat=Последнее обновление: {0}}" />
+                    <TextBlock Grid.Column="1"
+                               Text="Двойной щелчок по строке открывает карточку"
+                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Incident DataGrid — fills remaining height -->
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Rows}"
+                          SelectedItem="{Binding SelectedIncident}"
+                          AutoGenerateColumns="False"
+                          SelectionMode="Single"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          MouseDoubleClick="OnIncidentRowDoubleClick">
+                    <!--
+                        Row colouring:
+                          • unread         → bold
+                          • medium (4–7)   → faint amber
+                          • high   (≥ 7)   → faint red
+                        Triggers are ordered so IsHighRisk overrides IsMediumRisk on Background.
+                    -->
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsUnreadValue}" Value="True">
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsMediumRisk}" Value="True">
+                                    <Setter Property="Background" Value="#18FFAA00" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsHighRisk}" Value="True">
+                                    <Setter Property="Background" Value="#22FF2020" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <!-- SortMemberPath on Time and Score ensures correct ordering (not lexicographic) -->
+                        <DataGridTextColumn Header="Время (UTC)"
+                                            Binding="{Binding DisplayTimeUtc}"
+                                            SortMemberPath="EventAtUtcValue"
+                                            Width="1.35*"
+                                            MinWidth="120" />
+                        <DataGridTextColumn Header="Чат"
+                                            Binding="{Binding ChatTitle}"
+                                            Width="1.6*"
+                                            MinWidth="120" />
+                        <DataGridTextColumn Header="Пользователь"
+                                            Binding="{Binding Username}"
+                                            Width="1.1*"
+                                            MinWidth="90" />
+                        <DataGridTextColumn Header="Метка"
+                                            Binding="{Binding Label}"
+                                            Width="1.2*"
+                                            MinWidth="90" />
+                        <DataGridTextColumn Header="Score"
+                                            Binding="{Binding RiskScore}"
+                                            SortMemberPath="RiskScoreValue"
+                                            Width="0.7*"
+                                            MinWidth="60" />
+                        <DataGridTextColumn Header="Группа"
+                                            Binding="{Binding GroupedCount}"
+                                            Width="0.65*"
+                                            MinWidth="55" />
+                        <DataGridTextColumn Header="Статус"
+                                            Binding="{Binding InboxStatus}"
+                                            Width="0.85*"
+                                            MinWidth="70" />
+                        <DataGridTextColumn Header="Сообщение"
+                                            Binding="{Binding MessagePreview}"
+                                            Width="3*"
+                                            MinWidth="160" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Warnings — auto-height, minimal footprint when empty -->
+                <GroupBox Grid.Row="2" Margin="0,8,0,0" Header="{Binding WarningsHeadline}">
+                    <ListBox ItemsSource="{Binding Warnings}" />
+                </GroupBox>
+            </Grid>
+        </GroupBox>
+    </Grid>
+</UserControl>

@@ -963,22 +963,19 @@ public sealed class HadithCommandHandler
         }
 
         var sb = new StringBuilder();
-        sb.Append("Подборка: ");
-        sb.AppendLine(option.Title);
-        sb.AppendLine();
         sb.AppendLine(option.Intro);
-        sb.AppendLine();
 
         if (dua is not null)
         {
-            AppendCompactDuaCard(sb, "Короткая дуа", dua);
+            AppendSupportDuaCard(sb, dua);
         }
 
         if (azkar is not null)
         {
-            AppendCompactAzkarCard(sb, "Азкар", azkar);
+            AppendSupportAzkarCard(sb, azkar, includeSectionTitle: dua is not null);
         }
 
+        sb.AppendLine();
         sb.AppendLine("Если хотите продолжить по этой теме:");
 
         if (!string.IsNullOrWhiteSpace(option.DuaTopic))
@@ -1030,6 +1027,69 @@ public sealed class HadithCommandHandler
         }
 
         return new InlineKeyboardMarkup(rows);
+    }
+
+    private static void AppendSupportDuaCard(StringBuilder sb, DuaEntry dua)
+    {
+        AppendSupportCard(
+            sb,
+            sectionTitle: null,
+            title: dua.Title,
+            arabic: dua.Arabic,
+            transliteration: dua.Transliteration,
+            translation: dua.TranslationRu,
+            source: dua.Source);
+    }
+
+    private static void AppendSupportAzkarCard(StringBuilder sb, AzkarEntry azkar, bool includeSectionTitle)
+    {
+        AppendSupportCard(
+            sb,
+            sectionTitle: includeSectionTitle ? "Азкар" : null,
+            title: azkar.Title,
+            arabic: azkar.Arabic,
+            transliteration: azkar.Transliteration,
+            translation: azkar.TranslationRu,
+            source: azkar.Source);
+    }
+
+    private static void AppendSupportCard(
+        StringBuilder sb,
+        string? sectionTitle,
+        string title,
+        string? arabic,
+        string? transliteration,
+        string? translation,
+        string? source)
+    {
+        sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(sectionTitle))
+        {
+            sb.AppendLine(sectionTitle.Trim());
+            sb.AppendLine();
+        }
+
+        sb.AppendLine(title.Trim());
+        sb.AppendLine();
+        AppendSupportParagraph(sb, arabic);
+        AppendSupportParagraph(sb, transliteration);
+        AppendSupportParagraph(sb, translation);
+
+        if (!string.IsNullOrWhiteSpace(source))
+        {
+            sb.Append("Источник: ");
+            sb.AppendLine(source.Trim());
+        }
+    }
+
+    private static void AppendSupportParagraph(StringBuilder sb, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        sb.AppendLine(value.Trim());
+        sb.AppendLine();
     }
 
     private static void AppendCompactDuaCard(StringBuilder sb, string sectionTitle, DuaEntry dua)
