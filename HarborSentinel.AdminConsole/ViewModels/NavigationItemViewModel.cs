@@ -12,6 +12,7 @@ public sealed class NavigationItemViewModel : ObservableObject
         set => SetProperty(ref _label, value);
     }
 
+    public required string Icon { get; init; }
     public required string Caption { get; init; }
     public required PageViewModel Page { get; init; }
 

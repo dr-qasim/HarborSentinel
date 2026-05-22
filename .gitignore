@@ -29,6 +29,7 @@ HarborSentinel.Bot/AI/*.db
 
 # local analysis inputs
 analysis/moderation_reports/incoming/*.json
+docs/
 
 # packaged artifacts
 publish/
@@ -48,3 +49,7 @@ HarborSentinel.AdminConsole/appsettings.*.local.json
 
 # IDE / tool local settings
 .claude/
+
+# local operator diagnostics
+scripts/tunnel-check.ps1
+HarborSentinel.AdminConsole/Assets/logo.png

@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _incidentsNavigationItem = new NavigationItemViewModel
         {
             Label = incidents.NavigationLabel,
+            Icon = "\uE7BA",
             Caption = "Durable inbox инцидентов, риск и таймлайн",
             Page = incidents
         };
@@ -36,18 +37,21 @@ public sealed class MainWindowViewModel : ObservableObject
             new NavigationItemViewModel
             {
                 Label = "Обзор",
+                Icon = "\uE80F",
                 Caption = "Подключение и состояние системы",
                 Page = dashboard
             },
             new NavigationItemViewModel
             {
                 Label = "Чаты",
+                Icon = "\uE8BD",
                 Caption = "Реестр чатов и область текущего бота",
                 Page = chats
             },
             new NavigationItemViewModel
             {
                 Label = "Пользователи",
+                Icon = "\uE716",
                 Caption = "Пользователи и private-start",
                 Page = users
             },
@@ -55,12 +59,14 @@ public sealed class MainWindowViewModel : ObservableObject
             new NavigationItemViewModel
             {
                 Label = "Выгрузки",
+                Icon = "\uE8DE",
                 Caption = "Серверные задачи и файлы",
                 Page = exports
             },
             new NavigationItemViewModel
             {
                 Label = "Состояние узла",
+                Icon = "\uE9CE",
                 Caption = "Диагностика узла и runtime",
                 Page = nodeStatus
             }
@@ -69,8 +75,6 @@ public sealed class MainWindowViewModel : ObservableObject
         SelectedNavigationItem = NavigationItems[0];
     }
 
-    public string ShellTitle => "Операторская консоль";
-    public string ShellSubtitle => "Внутренний read-only клиент для обзора чатов, пользователей, инцидентов и выгрузок через AdminHost";
     public string ReadOnlyModeText => "Режим: только чтение";
     public string IncidentStatusText => _incidents.IncidentStatusBarText;
     public string StatusText => SelectedNavigationItem is null

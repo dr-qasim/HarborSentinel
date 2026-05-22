@@ -4,6 +4,19 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="DiagnosticRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                    <Setter Property="Background" Value="#40FFAA00" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                    <Setter Property="Background" Value="#45FF2020" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,0,0,8">
             <GroupBox Header="Узел и безопасность">
@@ -22,7 +35,13 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Статус" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock Text="●"
+                                   Margin="0,0,6,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusBrushConverter}}" />
+                        <TextBlock Text="{Binding ConnectionStatus}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </StackPanel>
                     <Button Grid.Row="0" Grid.Column="2" Margin="12,0,0,0" Command="{Binding RefreshCommand}" Content="Обновить" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Узел" Style="{StaticResource FieldLabelStyle}" />
@@ -41,7 +60,9 @@
 
             <GroupBox Header="Компоненты">
                 <Grid Margin="8">
-                    <DataGrid ItemsSource="{Binding Components}" AutoGenerateColumns="False">
+                    <DataGrid ItemsSource="{Binding Components}"
+                              AutoGenerateColumns="False"
+                              RowStyle="{StaticResource DiagnosticRowStyle}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Компонент" Binding="{Binding Label}" Width="180" />
                             <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
@@ -54,7 +75,9 @@
 
             <GroupBox Header="Пути и хранилища">
                 <Grid Margin="8">
-                    <DataGrid ItemsSource="{Binding Paths}" AutoGenerateColumns="False">
+                    <DataGrid ItemsSource="{Binding Paths}"
+                              AutoGenerateColumns="False"
+                              RowStyle="{StaticResource DiagnosticRowStyle}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Путь" Binding="{Binding Label}" Width="160" />
                             <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
@@ -69,7 +92,9 @@
 
             <GroupBox Header="Runtime schema">
                 <Grid Margin="8">
-                    <DataGrid ItemsSource="{Binding RuntimeTables}" AutoGenerateColumns="False">
+                    <DataGrid ItemsSource="{Binding RuntimeTables}"
+                              AutoGenerateColumns="False"
+                              RowStyle="{StaticResource DiagnosticRowStyle}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Таблица" Binding="{Binding TableName}" Width="170" />
                             <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
@@ -83,7 +108,9 @@
 
             <GroupBox Header="Capability / degraded-state">
                 <Grid Margin="8">
-                    <DataGrid ItemsSource="{Binding Capabilities}" AutoGenerateColumns="False">
+                    <DataGrid ItemsSource="{Binding Capabilities}"
+                              AutoGenerateColumns="False"
+                              RowStyle="{StaticResource DiagnosticRowStyle}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Экран" Binding="{Binding Label}" Width="150" />
                             <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />
@@ -103,7 +130,10 @@
 
                     <TextBlock Grid.Row="0" Text="{Binding IssueSummary}" TextWrapping="Wrap" />
 
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding RecentIssues}" AutoGenerateColumns="False">
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding RecentIssues}"
+                              AutoGenerateColumns="False"
+                              RowStyle="{StaticResource DiagnosticRowStyle}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Время" Binding="{Binding Timestamp}" Width="170" />
                             <DataGridTextColumn Header="Состояние" Binding="{Binding Severity}" Width="90" />

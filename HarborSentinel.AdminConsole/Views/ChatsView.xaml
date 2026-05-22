@@ -5,149 +5,190 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="clr-namespace:HarborSentinel.AdminConsole.Views"
              mc:Ignorable="d">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="0,0,0,8">
-            <GroupBox Header="Фильтры">
-                <Grid Margin="8">
+    <!--
+        Root Grid: 3 rows.
+          Row 0 — Filters (compact, never scrolls)
+          Row 1 — Status band (connection status + counts + scope)
+          Row 2 — Full-width chat list (fills remaining window height)
+
+        The detail card has been moved to a separate ChatCardWindow.
+        Removed the standalone "Сводка по реестру" GroupBox; its content is now
+        surfaced in the compact status band so the DataGrid can grow to fill the window.
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ══ Row 0: Filters ══ -->
+        <GroupBox Grid.Row="0" Header="Фильтры">
+            <Grid Margin="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="260" />
+                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                    <TextBlock Text="Состояние чатов" Style="{StaticResource FieldLabelStyle}" />
+                    <ComboBox ItemsSource="{Binding ActivityFilters}"
+                              SelectedItem="{Binding SelectedActivityFilter}"
+                              DisplayMemberPath="Label" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                    <TextBlock Text="Статус отслеживания" Style="{StaticResource FieldLabelStyle}" />
+                    <ComboBox ItemsSource="{Binding TrackingFilters}"
+                              SelectedItem="{Binding SelectedTrackingFilter}"
+                              DisplayMemberPath="Label" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Margin="0,0,12,0">
+                    <TextBlock Text="Поиск по названию, username или ID" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Фильтрует загруженный список по названию чата, username или ID." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Command="{Binding RefreshCommand}" Content="Обновить список" />
+                    <Button Content="Открыть карточку"
+                            IsEnabled="{Binding HasSelectedRow}"
+                            Click="OnOpenChatCardClick"
+                            ToolTip="Открыть полную карточку выбранного чата (также двойной щелчок по строке)" />
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <!-- ══ Row 1: Compact status band ══ -->
+        <Border Grid.Row="1"
+                Padding="4,4,4,8"
+                Margin="0,0,0,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal">
+                    <TextBlock Text="●"
+                               Margin="0,0,6,0"
+                               VerticalAlignment="Center"
+                               Foreground="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusBrushConverter}}" />
+                    <TextBlock Text="{Binding ConnectionStatus}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="1"
+                           Margin="0,2,0,0"
+                           Text="{Binding CountsSummary}"
+                           TextWrapping="Wrap" />
+
+                <TextBlock Grid.Row="2"
+                           Margin="0,2,0,0"
+                           Text="{Binding ScopeSummary}"
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+            </Grid>
+        </Border>
+
+        <!-- ══ Row 2: Full-width chat list ══ -->
+        <GroupBox Grid.Row="2" Header="Список чатов" Margin="0">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240" />
-                        <ColumnDefinition Width="260" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                        <TextBlock Text="Состояние чатов" Style="{StaticResource FieldLabelStyle}" />
-                        <ComboBox ItemsSource="{Binding ActivityFilters}"
-                                  SelectedItem="{Binding SelectedActivityFilter}"
-                                  DisplayMemberPath="Label" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                        <TextBlock Text="Статус отслеживания" Style="{StaticResource FieldLabelStyle}" />
-                        <ComboBox ItemsSource="{Binding TrackingFilters}"
-                                  SelectedItem="{Binding SelectedTrackingFilter}"
-                                  DisplayMemberPath="Label" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <Button Command="{Binding RefreshCommand}" Content="Обновить список" />
-                        <Button Content="Открыть карточку"
-                                IsEnabled="{Binding HasSelectedRow}"
-                                Click="OnOpenChatCardClick"
-                                ToolTip="Открыть полную карточку выбранного чата (также двойной щелчок по строке)" />
-                    </StackPanel>
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding LastUpdated, StringFormat=Последнее обновление: {0}}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1"
+                               Text="Двойной щелчок по строке открывает карточку"
+                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                               FontSize="11"
+                               VerticalAlignment="Center" />
                 </Grid>
-            </GroupBox>
 
-            <GroupBox Header="Сводка по реестру">
-                <Grid Margin="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="180" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- Chat DataGrid — fills remaining height -->
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Rows}"
+                          SelectedItem="{Binding SelectedRow}"
+                          AutoGenerateColumns="False"
+                          SelectionMode="Single"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          MouseDoubleClick="OnChatRowDoubleClick">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Название"
+                                            Binding="{Binding DisplayTitle}"
+                                            Width="2*"
+                                            MinWidth="160" />
+                        <DataGridTemplateColumn Header="ID чата" Width="1.1*" MinWidth="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <controls:CopyValueBlock DisplayText="{Binding ChatId}"
+                                                             CopyValue="{Binding ChatId}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Username" Width="1.2*" MinWidth="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <controls:CopyValueBlock DisplayText="{Binding Username}"
+                                                             CopyValue="{Binding UsernameCopyValue}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Тип"
+                                            Binding="{Binding ChatType}"
+                                            Width="0.95*"
+                                            MinWidth="80" />
+                        <DataGridTextColumn Header="Статус"
+                                            Binding="{Binding Status}"
+                                            Width="1*"
+                                            MinWidth="90" />
+                        <DataGridTextColumn Header="Активен"
+                                            Binding="{Binding Active}"
+                                            Width="0.8*"
+                                            MinWidth="70" />
+                        <DataGridTextColumn Header="Отслеживается"
+                                            Binding="{Binding Tracked}"
+                                            Width="1*"
+                                            MinWidth="90" />
+                        <DataGridTextColumn Header="Последняя активность (UTC)"
+                                            Binding="{Binding LastSeenUtc}"
+                                            Width="1.45*"
+                                            MinWidth="130" />
+                    </DataGrid.Columns>
+                </DataGrid>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние запроса" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                <!-- Pagination controls -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Center">
+                    <Button Command="{Binding PrevPageCommand}" Content="◀ Назад" Padding="8,4" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding PaginationSummary}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Command="{Binding NextPageCommand}" Content="Вперёд ▶" Padding="8,4" />
+                </StackPanel>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Область видимости" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ScopeSummary}" TextWrapping="Wrap" />
-
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Итоги" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CountsSummary}" TextWrapping="Wrap" />
-
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Запрос" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding QuerySummary}" TextWrapping="Wrap" />
-                </Grid>
-            </GroupBox>
-
-            <GroupBox Header="Список чатов">
-                <Grid Margin="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding LastUpdated, StringFormat=Последнее обновление: {0}}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1"
-                                   Text="Двойной щелчок по строке открывает карточку"
-                                   Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
-                                   FontSize="11"
-                                   VerticalAlignment="Center" />
-                    </Grid>
-
-                    <DataGrid Grid.Row="1"
-                              ItemsSource="{Binding Rows}"
-                              SelectedItem="{Binding SelectedRow}"
-                              AutoGenerateColumns="False"
-                              SelectionMode="Single"
-                              MinHeight="380"
-                              MouseDoubleClick="OnChatRowDoubleClick">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Название"
-                                                Binding="{Binding DisplayTitle}"
-                                                Width="2*"
-                                                MinWidth="160" />
-                            <DataGridTemplateColumn Header="ID чата" Width="1.1*" MinWidth="100">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <controls:CopyValueBlock DisplayText="{Binding ChatId}"
-                                                                 CopyValue="{Binding ChatId}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Username" Width="1.2*" MinWidth="100">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <controls:CopyValueBlock DisplayText="{Binding Username}"
-                                                                 CopyValue="{Binding UsernameCopyValue}" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Тип"
-                                                Binding="{Binding ChatType}"
-                                                Width="0.95*"
-                                                MinWidth="80" />
-                            <DataGridTextColumn Header="Статус"
-                                                Binding="{Binding Status}"
-                                                Width="1*"
-                                                MinWidth="90" />
-                            <DataGridTextColumn Header="Активен"
-                                                Binding="{Binding Active}"
-                                                Width="0.8*"
-                                                MinWidth="70" />
-                            <DataGridTextColumn Header="Отслеживается"
-                                                Binding="{Binding Tracked}"
-                                                Width="1*"
-                                                MinWidth="90" />
-                            <DataGridTextColumn Header="Последняя активность (UTC)"
-                                                Binding="{Binding LastSeenUtc}"
-                                                Width="1.45*"
-                                                MinWidth="130" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <GroupBox Grid.Row="2" Margin="0,12,0,0" Header="{Binding WarningsHeadline}">
-                        <Grid Margin="8">
-                            <ListBox ItemsSource="{Binding Warnings}" MinHeight="70" />
-                        </Grid>
-                    </GroupBox>
-                </Grid>
-            </GroupBox>
-        </StackPanel>
-    </ScrollViewer>
+                <!-- Warnings — auto-height, minimal footprint when empty -->
+                <GroupBox Grid.Row="3" Margin="0,8,0,0" Header="{Binding WarningsHeadline}">
+                    <ListBox ItemsSource="{Binding Warnings}" />
+                </GroupBox>
+            </Grid>
+        </GroupBox>
+    </Grid>
 </UserControl>

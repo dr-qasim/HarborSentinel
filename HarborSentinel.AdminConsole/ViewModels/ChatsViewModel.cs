@@ -9,22 +9,29 @@ namespace HarborSentinel.AdminConsole.ViewModels;
 
 public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
 {
+    private const int PageSize = 100;
+
     private readonly IAdminHostClient _adminHostClient;
     private readonly AdminConnectionSettings _connectionSettings;
     private readonly AsyncRelayCommand _refreshCommand;
     private readonly AsyncRelayCommand _refreshDetailCommand;
+    private readonly AsyncRelayCommand _nextPageCommand;
+    private readonly AsyncRelayCommand _prevPageCommand;
 
     private CancellationTokenSource? _listLoadCts;
     private CancellationTokenSource? _detailLoadCts;
     private bool _hasLoadedOnce;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
     private ChatFilterOptionViewModel<AdminChatActivityFilterDto>? _selectedActivityFilter;
     private ChatFilterOptionViewModel<AdminChatTrackingFilterDto>? _selectedTrackingFilter;
     private ChatListItemViewModel? _selectedRow;
     private ChatDetailViewModel? _selectedChatDetail;
+    private string _searchText = string.Empty;
     private string _connectionStatus = "Список чатов ещё не загружался.";
     private string _scopeSummary = "Область текущего бота будет применяться, если она поддерживается схемой runtime.";
     private string _countsSummary = "Сводка пока недоступна.";
-    private string _querySummary = "Фильтры: все чаты, все состояния отслеживания.";
+    private string _paginationSummary = "Страница 1 из 1";
     private string _lastUpdated = "Никогда";
     private string _detailStatus = "Выберите чат в списке, чтобы загрузить карточку.";
     private string _detailLastUpdated = "Никогда";
@@ -57,6 +64,8 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
         DetailWarnings = new ObservableCollection<string>();
         _refreshCommand = new AsyncRelayCommand(RefreshAsync);
         _refreshDetailCommand = new AsyncRelayCommand(RefreshSelectedChatDetailAsync, () => SelectedRow is not null);
+        _nextPageCommand = new AsyncRelayCommand(NextPageAsync, () => _currentPage < _totalPages);
+        _prevPageCommand = new AsyncRelayCommand(PrevPageAsync, () => _currentPage > 1);
     }
 
     public IReadOnlyList<ChatFilterOptionViewModel<AdminChatActivityFilterDto>> ActivityFilters { get; }
@@ -68,13 +77,25 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
     public ChatFilterOptionViewModel<AdminChatActivityFilterDto>? SelectedActivityFilter
     {
         get => _selectedActivityFilter;
-        set => SetProperty(ref _selectedActivityFilter, value);
+        set
+        {
+            if (!SetProperty(ref _selectedActivityFilter, value))
+                return;
+            if (_hasLoadedOnce)
+                _ = ResetAndRefreshAsync();
+        }
     }
 
     public ChatFilterOptionViewModel<AdminChatTrackingFilterDto>? SelectedTrackingFilter
     {
         get => _selectedTrackingFilter;
-        set => SetProperty(ref _selectedTrackingFilter, value);
+        set
+        {
+            if (!SetProperty(ref _selectedTrackingFilter, value))
+                return;
+            if (_hasLoadedOnce)
+                _ = ResetAndRefreshAsync();
+        }
     }
 
     public ChatListItemViewModel? SelectedRow
@@ -117,17 +138,29 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
         private set => SetProperty(ref _countsSummary, value);
     }
 
-    public string QuerySummary
-    {
-        get => _querySummary;
-        private set => SetProperty(ref _querySummary, value);
-    }
-
     public string LastUpdated
     {
         get => _lastUpdated;
         private set => SetProperty(ref _lastUpdated, value);
     }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set => SetProperty(ref _searchText, value);
+    }
+
+    public int CurrentPage => _currentPage;
+    public int TotalPages => _totalPages;
+
+    public string PaginationSummary
+    {
+        get => _paginationSummary;
+        private set => SetProperty(ref _paginationSummary, value);
+    }
+
+    public bool HasNextPage => _currentPage < _totalPages;
+    public bool HasPrevPage => _currentPage > 1;
 
     public string DetailStatus
     {
@@ -153,6 +186,8 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
 
     public AsyncRelayCommand RefreshCommand => _refreshCommand;
     public AsyncRelayCommand RefreshDetailCommand => _refreshDetailCommand;
+    public AsyncRelayCommand NextPageCommand => _nextPageCommand;
+    public AsyncRelayCommand PrevPageCommand => _prevPageCommand;
 
     public async Task InitializeAsync()
     {
@@ -174,8 +209,8 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
                     _connectionSettings.BaseUrl,
                     _connectionSettings.ApiToken,
                     _connectionSettings.RequestTimeout,
-                    page: 1,
-                    pageSize: 100,
+                    page: _currentPage,
+                    pageSize: PageSize,
                     SelectedActivityFilter?.Value ?? AdminChatActivityFilterDto.All,
                     SelectedTrackingFilter?.Value ?? AdminChatTrackingFilterDto.All,
                     requestCts.Token)
@@ -183,21 +218,26 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
 
             Rows.Clear();
             foreach (var item in response.Items)
-                Rows.Add(MapItem(item));
+            {
+                var vm = MapItem(item);
+                if (!string.IsNullOrWhiteSpace(_searchText) &&
+                    !MatchesSearch(vm, _searchText))
+                    continue;
+                Rows.Add(vm);
+            }
+
+            _totalPages = Math.Max(1, (int)Math.Ceiling((double)response.TotalCount / PageSize));
+            UpdatePaginationState();
 
             Warnings.Clear();
             foreach (var warning in response.Warnings)
                 Warnings.Add(warning);
-
-            if (response.ReturnedCount < response.TotalCount)
-                Warnings.Add($"Показано {response.ReturnedCount} из {response.TotalCount} чатов. Уточните фильтры, чтобы сузить выборку.");
 
             ScopeSummary = response.Summary.CurrentBotScopeApplied
                 ? "Показываются только чаты, видимые текущему экземпляру бота."
                 : "Работа идёт в режиме legacy schema: изоляция по текущему боту недоступна.";
 
             CountsSummary = BuildCountsSummary(response);
-            QuerySummary = $"Фильтры: {SelectedActivityFilter?.Label ?? "Все чаты"} | {SelectedTrackingFilter?.Label ?? "Все состояния"} | Показано {response.ReturnedCount} из {response.TotalCount}";
             LastUpdated = DateTimeOffset.UtcNow.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", System.Globalization.CultureInfo.InvariantCulture);
             ConnectionStatus = response.TotalCount == 0
                 ? "Подключение установлено. По текущим фильтрам чаты не найдены."
@@ -228,7 +268,6 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
             ConnectionStatus = $"Ошибка запроса: {AdminHostErrorFormatter.Describe(ex)}";
             ScopeSummary = "Проверьте доступность AdminHost, SSH-туннель и настройки путей runtime.";
             CountsSummary = "Слой запросов только для чтения доступен архитектурно, но этот запрос завершился ошибкой.";
-            QuerySummary = "Снимок реестра чатов недоступен.";
             Rows.Clear();
             Warnings.Clear();
             Warnings.Add("Не удалось получить список чатов. Убедитесь, что AdminHost запущен и доступен по указанному адресу.");
@@ -239,6 +278,47 @@ public sealed class ChatsViewModel : PageViewModel, IAsyncPageInitializable
         {
             CancellationHelper.Complete(ref _listLoadCts, requestCts);
         }
+    }
+
+    private async Task ResetAndRefreshAsync()
+    {
+        _currentPage = 1;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_currentPage >= _totalPages) return;
+        _currentPage++;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task PrevPageAsync()
+    {
+        if (_currentPage <= 1) return;
+        _currentPage--;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private void UpdatePaginationState()
+    {
+        PaginationSummary = $"Страница {_currentPage} из {_totalPages}";
+        OnPropertyChanged(nameof(CurrentPage));
+        OnPropertyChanged(nameof(TotalPages));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(HasPrevPage));
+        _nextPageCommand.RaiseCanExecuteChanged();
+        _prevPageCommand.RaiseCanExecuteChanged();
+    }
+
+    private static bool MatchesSearch(ChatListItemViewModel item, string search)
+    {
+        return item.DisplayTitle.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               item.Username.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               item.ChatId.ToString().Contains(search, StringComparison.Ordinal);
     }
 
     private async Task RefreshSelectedChatDetailAsync()

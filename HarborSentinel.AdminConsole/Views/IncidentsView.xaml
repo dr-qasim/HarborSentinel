@@ -66,10 +66,6 @@
                 <StackPanel Grid.Column="8" VerticalAlignment="Bottom" Orientation="Horizontal">
                     <Button Command="{Binding RefreshCommand}"
                             Content="Обновить ленту" />
-                    <Button Content="Открыть карточку"
-                            IsEnabled="{Binding HasSelectedIncident}"
-                            Click="OnOpenIncidentCardClick"
-                            ToolTip="Открыть полную карточку выбранного инцидента (также двойной щелчок по строке)" />
                 </StackPanel>
             </Grid>
         </GroupBox>
@@ -88,9 +84,14 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0"
-                           Text="{Binding ConnectionStatus}"
-                           TextWrapping="Wrap" />
+                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="●"
+                               Margin="0,0,6,0"
+                               VerticalAlignment="Center"
+                               Foreground="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusBrushConverter}}" />
+                    <TextBlock Text="{Binding ConnectionStatus}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
                 <TextBlock Grid.Row="1" Grid.Column="0"
                            Margin="0,2,12,0"
                            Text="{Binding ReviewStateSummary}"
@@ -107,6 +108,10 @@
                             Content="Отметить просмотренными" />
                     <Button Command="{Binding AcknowledgeSelectedCommand}"
                             Content="Подтвердить разбор" />
+                    <Button Content="Открыть карточку"
+                            IsEnabled="{Binding HasSelectedIncident}"
+                            Click="OnOpenIncidentCardClick"
+                            ToolTip="Открыть полную карточку выбранного инцидента (также двойной щелчок по строке)" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -117,6 +122,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
@@ -158,10 +164,10 @@
                                     <Setter Property="FontWeight" Value="SemiBold" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsMediumRisk}" Value="True">
-                                    <Setter Property="Background" Value="#18FFAA00" />
+                                    <Setter Property="Background" Value="#40FFAA00" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsHighRisk}" Value="True">
-                                    <Setter Property="Background" Value="#22FF2020" />
+                                    <Setter Property="Background" Value="#45FF2020" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -205,8 +211,15 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
+                <!-- Pagination controls -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0" HorizontalAlignment="Center">
+                    <Button Command="{Binding PrevPageCommand}" Content="◀ Назад" Padding="8,4" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding PaginationSummary}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Command="{Binding NextPageCommand}" Content="Вперёд ▶" Padding="8,4" />
+                </StackPanel>
+
                 <!-- Warnings — auto-height, minimal footprint when empty -->
-                <GroupBox Grid.Row="2" Margin="0,8,0,0" Header="{Binding WarningsHeadline}">
+                <GroupBox Grid.Row="3" Margin="0,8,0,0" Header="{Binding WarningsHeadline}">
                     <ListBox ItemsSource="{Binding Warnings}" />
                 </GroupBox>
             </Grid>

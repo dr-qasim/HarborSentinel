@@ -226,8 +226,7 @@
                             Content="Обновить"
                             ToolTip="Перезагрузить карточку чата" />
                     <Button Content="Закрыть"
-                            Click="OnCloseClick"
-                            Margin="0,0,0,0" />
+                            Click="OnCloseClick" />
                 </StackPanel>
             </Grid>
         </Border>

@@ -13,7 +13,9 @@
         MinWidth="1180"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized">
+
     <Window.Resources>
+        <!-- Page → View routing (DataTemplate per ViewModel type) -->
         <DataTemplate DataType="{x:Type viewModels:DashboardViewModel}">
             <views:DashboardView />
         </DataTemplate>
@@ -35,15 +37,44 @@
         <DataTemplate DataType="{x:Type viewModels:PlaceholderViewModel}">
             <views:PlaceholderView />
         </DataTemplate>
+
+        <!-- Nav item: icon + label centred vertically in the sidebar -->
+        <DataTemplate x:Key="NavItemTemplate">
+            <StackPanel HorizontalAlignment="Center" Margin="0,2">
+                <TextBlock Text="{Binding Icon}"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="22"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Label}"
+                           FontSize="11"
+                           FontWeight="Normal"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="0,5,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Nav ListBoxItem: full-width, hand cursor, no focus rect -->
+        <Style x:Key="NavItemContainerStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="{Binding Caption}" />
+        </Style>
     </Window.Resources>
 
     <DockPanel>
+        <!-- ══ Top menu bar ══ -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Файл">
                 <MenuItem Header="Выход" Click="OnExitClick" />
             </MenuItem>
         </Menu>
 
+        <!-- ══ Bottom status bar ══ -->
         <StatusBar DockPanel.Dock="Bottom">
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusText}" />
@@ -58,44 +89,86 @@
             </StatusBarItem>
         </StatusBar>
 
-        <Grid Margin="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="8" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <!-- ══ Main area: sidebar (left) + content (right) ══ -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="148" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <DockPanel Grid.Row="0">
-                <StackPanel MaxWidth="1180">
-                    <TextBlock Text="{Binding ShellTitle}"
-                               FontSize="24"
+            <!-- ── Left navigation sidebar ── -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+                    BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <!-- App identity header -->
+                    <Border DockPanel.Dock="Top"
+                            BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                            BorderThickness="0,0,0,1"
+                            Padding="10,14,10,12" Background="White">
+                        <StackPanel>
+                            <Image Source="Assets/logo.jpg"
+                                   Width="44"
+                                   Height="90"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,6"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   ToolTip="HarborSentinel" >
+                                <Image.OpacityMask>
+                                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                        <GradientStop Color="Black"/>
+                                        <GradientStop Color="White" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Image.OpacityMask>
+                            </Image>
+                            <TextBlock Text="Дозор"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Операторская консоль"
+                                       FontSize="10"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Navigation items -->
+                    <ListBox DockPanel.Dock="Top"
+                             ItemsSource="{Binding NavigationItems}"
+                             SelectedItem="{Binding SelectedNavigationItem}"
+                             ItemTemplate="{StaticResource NavItemTemplate}"
+                             ItemContainerStyle="{StaticResource NavItemContainerStyle}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                </DockPanel>
+            </Border>
+
+            <!-- ── Right content area ── -->
+            <Grid Grid.Column="1" Margin="14,12,14,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="10" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Page header: title + subtitle -->
+                <StackPanel Grid.Row="0" MaxWidth="1300">
+                    <TextBlock Text="{Binding CurrentPage.Title}"
+                               FontSize="20"
                                FontWeight="SemiBold" />
-                    <TextBlock Margin="0,6,0,0"
-                               Text="{Binding ShellSubtitle}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Margin="0,6,0,0"
-                               FontWeight="SemiBold"
-                               Text="{Binding CurrentPage.Title}" />
-                    <TextBlock Margin="0,2,0,0"
+                    <TextBlock Margin="0,4,0,0"
                                Text="{Binding CurrentPage.Subtitle}"
-                               TextWrapping="Wrap" />
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
                 </StackPanel>
-            </DockPanel>
 
-            <TabControl Grid.Row="2"
-                        ItemsSource="{Binding NavigationItems}"
-                        SelectedItem="{Binding SelectedNavigationItem}">
-                <TabControl.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Label}" Margin="8,2" />
-                    </DataTemplate>
-                </TabControl.ItemTemplate>
-                <TabControl.ContentTemplate>
-                    <DataTemplate>
-                        <ContentControl Content="{Binding Page}" Margin="8" />
-                    </DataTemplate>
-                </TabControl.ContentTemplate>
-            </TabControl>
+                <!-- Page content — routed via DataTemplates in Window.Resources -->
+                <ContentControl Grid.Row="2"
+                                Content="{Binding CurrentPage}" />
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

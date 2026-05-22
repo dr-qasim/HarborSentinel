@@ -131,7 +131,13 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Состояние запроса" Style="{StaticResource FieldLabelStyle}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock Text="●"
+                                   Margin="0,0,6,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding ConnectionStatus, Converter={StaticResource ConnectionStatusBrushConverter}}" />
+                        <TextBlock Text="{Binding ConnectionStatus}" TextWrapping="Wrap" />
+                    </StackPanel>
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Каталог" Style="{StaticResource FieldLabelStyle}" />
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSummary}" TextWrapping="Wrap" />
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Задачи" Style="{StaticResource FieldLabelStyle}" />

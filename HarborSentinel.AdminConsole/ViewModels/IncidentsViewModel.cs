@@ -9,6 +9,7 @@ namespace HarborSentinel.AdminConsole.ViewModels;
 public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
 {
     private static readonly TimeSpan InboxPollingInterval = TimeSpan.FromSeconds(30);
+    private const int PageSize = 100;
 
     private readonly IAdminHostClient _adminHostClient;
     private readonly AdminConnectionSettings _connectionSettings;
@@ -16,12 +17,17 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
     private readonly AsyncRelayCommand _refreshCommand;
     private readonly AsyncRelayCommand _markUnreadAsSeenCommand;
     private readonly AsyncRelayCommand _acknowledgeSelectedCommand;
+    private readonly AsyncRelayCommand _nextPageCommand;
+    private readonly AsyncRelayCommand _prevPageCommand;
 
     private readonly List<IncidentListItemViewModel> _allRows = [];
     private CancellationTokenSource? _loadCts;
     private bool _hasLoadedOnce;
     private bool _monitoringStarted;
     private bool _syncInProgress;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+    private string _paginationSummary = "Страница 1 из 1";
     private IncidentWindowOptionViewModel? _selectedWindow;
     private IncidentSeverityFilterViewModel? _selectedSeverityFilter;
     private string _searchText = string.Empty;
@@ -71,6 +77,8 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
         _refreshCommand = new AsyncRelayCommand(RefreshAsync);
         _markUnreadAsSeenCommand = new AsyncRelayCommand(MarkUnreadAsSeenAsync, () => UnreadCount > 0);
         _acknowledgeSelectedCommand = new AsyncRelayCommand(AcknowledgeSelectedIncidentAsync, CanAcknowledgeSelectedIncident);
+        _nextPageCommand = new AsyncRelayCommand(NextPageAsync, () => _currentPage < _totalPages);
+        _prevPageCommand = new AsyncRelayCommand(PrevPageAsync, () => _currentPage > 1);
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = InboxPollingInterval
@@ -86,7 +94,13 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
     public IncidentWindowOptionViewModel? SelectedWindow
     {
         get => _selectedWindow;
-        set => SetProperty(ref _selectedWindow, value);
+        set
+        {
+            if (!SetProperty(ref _selectedWindow, value))
+                return;
+            if (_hasLoadedOnce)
+                _ = ResetAndRefreshAsync();
+        }
     }
 
     public IncidentSeverityFilterViewModel? SelectedSeverityFilter
@@ -245,6 +259,20 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
     public AsyncRelayCommand RefreshCommand => _refreshCommand;
     public AsyncRelayCommand MarkUnreadAsSeenCommand => _markUnreadAsSeenCommand;
     public AsyncRelayCommand AcknowledgeSelectedCommand => _acknowledgeSelectedCommand;
+    public AsyncRelayCommand NextPageCommand => _nextPageCommand;
+    public AsyncRelayCommand PrevPageCommand => _prevPageCommand;
+
+    public int CurrentPage => _currentPage;
+    public int TotalPages => _totalPages;
+
+    public string PaginationSummary
+    {
+        get => _paginationSummary;
+        private set => SetProperty(ref _paginationSummary, value);
+    }
+
+    public bool HasNextPage => _currentPage < _totalPages;
+    public bool HasPrevPage => _currentPage > 1;
 
     public async Task InitializeAsync()
     {
@@ -318,8 +346,8 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
                     _connectionSettings.ApiToken,
                     _connectionSettings.OperatorId,
                     _connectionSettings.RequestTimeout,
-                    page: 1,
-                    pageSize: 100,
+                    page: _currentPage,
+                    pageSize: PageSize,
                     chatIdFilter,
                     SelectedWindow?.Days ?? 30,
                     requestCts.Token)
@@ -328,6 +356,9 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
             _allRows.Clear();
             foreach (var item in response.Items)
                 _allRows.Add(MapItem(item));
+
+            _totalPages = Math.Max(1, (int)Math.Ceiling((double)response.TotalCount / PageSize));
+            UpdatePaginationState();
 
             Warnings.Clear();
             foreach (var warning in response.Warnings)
@@ -498,6 +529,40 @@ public sealed class IncidentsViewModel : PageViewModel, IAsyncPageInitializable
             SelectedIncident = null;
 
         OnPropertyChanged(nameof(WarningsHeadline));
+    }
+
+    private async Task ResetAndRefreshAsync()
+    {
+        _currentPage = 1;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_currentPage >= _totalPages) return;
+        _currentPage++;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task PrevPageAsync()
+    {
+        if (_currentPage <= 1) return;
+        _currentPage--;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private void UpdatePaginationState()
+    {
+        PaginationSummary = $"Страница {_currentPage} из {_totalPages}";
+        OnPropertyChanged(nameof(CurrentPage));
+        OnPropertyChanged(nameof(TotalPages));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(HasPrevPage));
+        _nextPageCommand.RaiseCanExecuteChanged();
+        _prevPageCommand.RaiseCanExecuteChanged();
     }
 
     private void UpdateNavigationLabel()

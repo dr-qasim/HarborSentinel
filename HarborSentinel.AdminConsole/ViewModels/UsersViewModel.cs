@@ -9,14 +9,20 @@ namespace HarborSentinel.AdminConsole.ViewModels;
 
 public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
 {
+    private const int PageSize = 100;
+
     private readonly IAdminHostClient _adminHostClient;
     private readonly AdminConnectionSettings _connectionSettings;
     private readonly AsyncRelayCommand _refreshCommand;
     private readonly AsyncRelayCommand _refreshDetailCommand;
+    private readonly AsyncRelayCommand _nextPageCommand;
+    private readonly AsyncRelayCommand _prevPageCommand;
 
     private CancellationTokenSource? _listLoadCts;
     private CancellationTokenSource? _detailLoadCts;
     private bool _hasLoadedOnce;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
     private ChatFilterOptionViewModel<AdminUserListSourceFilterDto>? _selectedSourceFilter;
     private UserListItemViewModel? _selectedRow;
     private UserDetailViewModel? _selectedUserDetail;
@@ -24,7 +30,7 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
     private string _connectionStatus = "Список пользователей ещё не загружался.";
     private string _scopeSummary = "Показываются текущие и исторические пользователи. Контур текущего бота будет отмечен, если это поддерживается схемой runtime.";
     private string _countsSummary = "Сводка пока недоступна.";
-    private string _querySummary = "Фильтры пока не применялись.";
+    private string _paginationSummary = "Страница 1 из 1";
     private string _lastUpdated = "Никогда";
     private string _detailStatus = "Выберите пользователя в списке, чтобы открыть карточку.";
     private string _detailLastUpdated = "Никогда";
@@ -48,6 +54,8 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
         DetailWarnings = new ObservableCollection<string>();
         _refreshCommand = new AsyncRelayCommand(RefreshAsync);
         _refreshDetailCommand = new AsyncRelayCommand(RefreshSelectedUserDetailAsync, () => SelectedRow is not null);
+        _nextPageCommand = new AsyncRelayCommand(NextPageAsync, () => _currentPage < _totalPages);
+        _prevPageCommand = new AsyncRelayCommand(PrevPageAsync, () => _currentPage > 1);
     }
 
     public IReadOnlyList<ChatFilterOptionViewModel<AdminUserListSourceFilterDto>> SourceFilters { get; }
@@ -58,7 +66,13 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
     public ChatFilterOptionViewModel<AdminUserListSourceFilterDto>? SelectedSourceFilter
     {
         get => _selectedSourceFilter;
-        set => SetProperty(ref _selectedSourceFilter, value);
+        set
+        {
+            if (!SetProperty(ref _selectedSourceFilter, value))
+                return;
+            if (_hasLoadedOnce)
+                _ = ResetAndRefreshAsync();
+        }
     }
 
     public bool HasSelectedRow => _selectedRow is not null;
@@ -107,12 +121,6 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
         private set => SetProperty(ref _countsSummary, value);
     }
 
-    public string QuerySummary
-    {
-        get => _querySummary;
-        private set => SetProperty(ref _querySummary, value);
-    }
-
     public string LastUpdated
     {
         get => _lastUpdated;
@@ -143,6 +151,20 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
 
     public AsyncRelayCommand RefreshCommand => _refreshCommand;
     public AsyncRelayCommand RefreshDetailCommand => _refreshDetailCommand;
+    public AsyncRelayCommand NextPageCommand => _nextPageCommand;
+    public AsyncRelayCommand PrevPageCommand => _prevPageCommand;
+
+    public int CurrentPage => _currentPage;
+    public int TotalPages => _totalPages;
+
+    public string PaginationSummary
+    {
+        get => _paginationSummary;
+        private set => SetProperty(ref _paginationSummary, value);
+    }
+
+    public bool HasNextPage => _currentPage < _totalPages;
+    public bool HasPrevPage => _currentPage > 1;
 
     public async Task InitializeAsync()
     {
@@ -164,8 +186,8 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
                     _connectionSettings.BaseUrl,
                     _connectionSettings.ApiToken,
                     _connectionSettings.RequestTimeout,
-                    page: 1,
-                    pageSize: 100,
+                    page: _currentPage,
+                    pageSize: PageSize,
                     SelectedSourceFilter?.Value ?? AdminUserListSourceFilterDto.All,
                     SearchText,
                     requestCts.Token)
@@ -175,19 +197,18 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
             foreach (var item in response.Items)
                 Rows.Add(MapItem(item));
 
+            _totalPages = Math.Max(1, (int)Math.Ceiling((double)response.TotalCount / PageSize));
+            UpdatePaginationState();
+
             Warnings.Clear();
             foreach (var warning in response.Warnings)
                 Warnings.Add(warning);
-
-            if (response.ReturnedCount < response.TotalCount)
-                Warnings.Add($"Показано {response.ReturnedCount} из {response.TotalCount} пользователей. Уточните фильтры или поисковый запрос, чтобы сузить выборку.");
 
             ScopeSummary = response.Summary.CurrentBotScopeApplied
                 ? "Показываются текущие и исторические пользователи. Исторические записи не скрываются, а текущий контур определяется по chat_registry."
                 : "Работа идёт в режиме legacy schema: область текущего бота определить нельзя, поэтому доступен весь исторический контекст.";
 
             CountsSummary = BuildCountsSummary(response);
-            QuerySummary = $"Фильтры: {SelectedSourceFilter?.Label ?? "Все пользователи"} | Поиск: {FormatSearchQuery(response.SearchQuery)} | Показано {response.ReturnedCount} из {response.TotalCount}";
             LastUpdated = ChatPresentationFormatter.FormatTimestamp(DateTimeOffset.UtcNow);
             ConnectionStatus = response.TotalCount == 0
                 ? BuildEmptyUsersStatus(response.SearchQuery)
@@ -218,7 +239,6 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
             ConnectionStatus = $"Ошибка запроса: {AdminHostErrorFormatter.Describe(ex)}";
             ScopeSummary = "Проверьте доступность AdminHost, SSH-туннель и настройки путей runtime.";
             CountsSummary = "Слой запросов только для чтения доступен архитектурно, но этот запрос завершился ошибкой.";
-            QuerySummary = "Снимок реестра пользователей недоступен.";
             Rows.Clear();
             Warnings.Clear();
             Warnings.Add("Не удалось получить список пользователей. Убедитесь, что AdminHost запущен и доступен по указанному адресу.");
@@ -343,6 +363,40 @@ public sealed class UsersViewModel : PageViewModel, IAsyncPageInitializable
 
     private static string FormatSearchQuery(string? searchQuery)
         => string.IsNullOrWhiteSpace(searchQuery) ? "нет" : $"\"{searchQuery}\"";
+
+    private async Task ResetAndRefreshAsync()
+    {
+        _currentPage = 1;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_currentPage >= _totalPages) return;
+        _currentPage++;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private async Task PrevPageAsync()
+    {
+        if (_currentPage <= 1) return;
+        _currentPage--;
+        UpdatePaginationState();
+        await RefreshAsync().ConfigureAwait(true);
+    }
+
+    private void UpdatePaginationState()
+    {
+        PaginationSummary = $"Страница {_currentPage} из {_totalPages}";
+        OnPropertyChanged(nameof(CurrentPage));
+        OnPropertyChanged(nameof(TotalPages));
+        OnPropertyChanged(nameof(HasNextPage));
+        OnPropertyChanged(nameof(HasPrevPage));
+        _nextPageCommand.RaiseCanExecuteChanged();
+        _prevPageCommand.RaiseCanExecuteChanged();
+    }
 
     private static UserListItemViewModel MapItem(AdminUserListItemDto item)
     {

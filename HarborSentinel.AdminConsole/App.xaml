@@ -2,8 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:viewModels="clr-namespace:HarborSentinel.AdminConsole.ViewModels"
-             xmlns:views="clr-namespace:HarborSentinel.AdminConsole.Views">
+             xmlns:views="clr-namespace:HarborSentinel.AdminConsole.Views"
+             xmlns:infrastructure="clr-namespace:HarborSentinel.AdminConsole.Infrastructure">
     <Application.Resources>
+        <infrastructure:ConnectionStatusBrushConverter x:Key="ConnectionStatusBrushConverter" />
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontSize" Value="13" />
